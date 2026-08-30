@@ -1,0 +1,18 @@
+[tools]
+go = "1.27.0"
+
+[tasks.test]
+description = "Run the test suite"
+run = "go test ./..."
+
+[tasks.fmt]
+description = "Check Go formatting"
+run = "test -z \"$(gofmt -l .)\""
+
+[tasks.vet]
+description = "Run static analysis"
+run = "go vet ./..."
+
+[tasks.check]
+description = "Run all local quality gates"
+depends = ["fmt", "vet", "test"]

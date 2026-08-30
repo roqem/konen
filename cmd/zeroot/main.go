@@ -1,0 +1,51 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/roqem/zeroot/internal/app"
+	"github.com/roqem/zeroot/internal/config"
+	"github.com/roqem/zeroot/internal/execx"
+	"github.com/roqem/zeroot/internal/ui"
+)
+
+var version = "dev"
+
+func main() {
+	configPath, err := config.DefaultPath()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "erro: não foi possível localizar a configuração: %v\n", err)
+		os.Exit(1)
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "erro: não foi possível localizar seu diretório pessoal: %v\n", err)
+		os.Exit(1)
+	}
+
+	runner := execx.OSRunner{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}
+	application := app.New(app.Options{
+		ConfigPath:  configPath,
+		HomeDir:     homeDir,
+		In:          os.Stdin,
+		Out:         os.Stdout,
+		Err:         os.Stderr,
+		Runner:      runner,
+		Prompter:    ui.NewHuhPrompter(os.Stdin, os.Stderr),
+		Interactive: isTerminal(os.Stdin),
+		Version:     version,
+	})
+
+	if err := application.Run(context.Background(), os.Args[1:]); err != nil {
+		fmt.Fprintf(os.Stderr, "erro: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func isTerminal(file *os.File) bool {
+	info, err := file.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}

@@ -1,0 +1,44 @@
+# Architecture and scope
+
+## Product boundary
+
+Zeroot owns the first-run experience, the location of the user's machine state,
+diagnostics and a small interactive menu. Mise owns convergence: operating-system
+packages, development tools, repositories, services, tasks and dotfiles.
+
+The initial implementation does not depend on chezmoi. Current mise releases
+already provide dotfile add, status, dry-run previews, apply, templates, copy/symlink modes
+and environment profiles. Adding a second dotfile engine now would duplicate
+responsibility. The boundary remains explicit enough to reconsider this if a
+real unsupported use case appears.
+
+## Trust and mutation
+
+- State remains a normal directory and may be a normal Git repository.
+- Zeroot never commits or pushes automatically.
+- `apply` delegates confirmation and convergence to mise.
+- Remote state is not trusted silently; mise's own trust flow remains visible.
+- Secrets are not imported automatically and common plaintext secret files are
+  ignored in newly created state repositories.
+
+## Extensions
+
+### Themes
+
+Theme persistence is a legitimate future Zeroot extension. The legacy behavior
+coordinates Starship presets and Kitty themes, preserves local customization and
+prevents theme tools from silently resetting the desired state. This belongs
+near state capture/apply and is planned as `zeroot theme`, not as a separate
+repository for now.
+
+The implementation must write the selected result back into managed state,
+rather than keeping ad-hoc backup files beside live configuration.
+
+### Safe paste for Zsh
+
+The large-paste widget is independent of workstation convergence and hooks into
+security-sensitive shell behavior. It is not part of the Zeroot core. It may be
+extracted into a dedicated Zsh plugin after it has focused automated tests for
+buffer handling, cancellation, temporary files and the no-execution fallbacks.
+
+Until then, users can keep the legacy script in their personal state repository.
