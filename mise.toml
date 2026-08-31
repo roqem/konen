@@ -13,6 +13,10 @@ run = "test -z \"$(gofmt -l .)\""
 description = "Run static analysis"
 run = "go vet ./..."
 
+[tasks.build]
+description = "Build the local Zeroot executable"
+run = "go build -trimpath -o bin/zeroot ./cmd/zeroot"
+
 [tasks.check]
 description = "Run all local quality gates"
 depends = ["fmt", "vet", "test"]

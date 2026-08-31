@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/roqem/zeroot/internal/app"
 	"github.com/roqem/zeroot/internal/config"
@@ -37,12 +38,21 @@ func main() {
 		Prompter:    ui.NewHuhPrompter(os.Stdin, os.Stderr),
 		Interactive: isTerminal(os.Stdin),
 		Version:     version,
+		BinDir:      executableDir(),
 	})
 
 	if err := application.Run(context.Background(), os.Args[1:]); err != nil {
 		fmt.Fprintf(os.Stderr, "erro: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func executableDir() string {
+	executable, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return filepath.Dir(executable)
 }
 
 func isTerminal(file *os.File) bool {

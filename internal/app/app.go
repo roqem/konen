@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -28,6 +29,7 @@ type Options struct {
 	Prompter    ui.Prompter
 	Interactive bool
 	Version     string
+	BinDir      string
 }
 
 type App struct {
@@ -67,6 +69,8 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return a.runApply(ctx, args[1:])
 	case "add":
 		return a.runAdd(ctx, args[1:])
+	case "trust":
+		return a.runTrust(ctx, args[1:])
 	case "doctor":
 		return a.runDoctor(ctx)
 	case "version", "--version", "-v":
@@ -112,9 +116,12 @@ func (a *App) runInit(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	createdLocalConfig := false
 	if answer.Remote != "" {
 		err = a.state.Clone(ctx, answer.Remote, resolved)
 	} else {
+		_, statErr := os.Stat(filepath.Join(resolved, "mise.toml"))
+		createdLocalConfig = errors.Is(statErr, fs.ErrNotExist)
 		err = a.state.PrepareLocal(ctx, resolved, answer.InitializeGit)
 	}
 	if err != nil {
@@ -124,11 +131,24 @@ func (a *App) runInit(ctx context.Context, args []string) error {
 		return err
 	}
 
+	misePath, miseErr := a.findCommand("mise")
+	trusted := false
+	if answer.Remote == "" && createdLocalConfig && miseErr == nil {
+		miseConfig := filepath.Join(resolved, "mise.toml")
+		if err := a.options.Runner.Run(ctx, resolved, misePath, "trust", miseConfig); err != nil {
+			return fmt.Errorf("estado criado, mas não foi possível confiar no mise.toml: %w", err)
+		}
+		trusted = true
+	}
+
 	fmt.Fprintf(a.options.Out, "Zeroot configurado. Estado: %s\n", resolved)
-	if _, err := a.options.Runner.LookPath("mise"); err != nil {
-		fmt.Fprintln(a.options.Out, "Próximo passo: instale o mise e execute `zeroot apply`.")
-	} else {
+	switch {
+	case trusted:
 		fmt.Fprintln(a.options.Out, "Próximo passo: execute `zeroot apply`.")
+	case miseErr != nil:
+		fmt.Fprintln(a.options.Out, "Próximo passo: instale o mise, revise o mise.toml e execute `zeroot trust`.")
+	default:
+		fmt.Fprintln(a.options.Out, "Revise o mise.toml e execute `zeroot trust` antes de aplicar o estado.")
 	}
 	return nil
 }
@@ -197,13 +217,34 @@ func (a *App) runMise(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := a.options.Runner.LookPath("mise"); err != nil {
+	misePath, err := a.findCommand("mise")
+	if err != nil {
 		return errors.New("mise não está instalado; consulte https://mise.jdx.dev/installing-mise.html")
 	}
 	miseArgs := append([]string{"-C", stateDir}, args...)
-	if err := a.options.Runner.Run(ctx, stateDir, "mise", miseArgs...); err != nil {
+	if err := a.options.Runner.Run(ctx, stateDir, misePath, miseArgs...); err != nil {
 		return fmt.Errorf("mise: %w", err)
 	}
+	return nil
+}
+
+func (a *App) runTrust(ctx context.Context, args []string) error {
+	if len(args) != 0 {
+		return errors.New("trust não aceita argumentos")
+	}
+	stateDir, err := a.loadState()
+	if err != nil {
+		return err
+	}
+	misePath, err := a.findCommand("mise")
+	if err != nil {
+		return errors.New("mise não está instalado; consulte https://mise.jdx.dev/installing-mise.html")
+	}
+	miseConfig := filepath.Join(stateDir, "mise.toml")
+	if err := a.options.Runner.Run(ctx, stateDir, misePath, "trust", miseConfig); err != nil {
+		return fmt.Errorf("mise trust: %w", err)
+	}
+	fmt.Fprintf(a.options.Out, "Estado confiado: %s\n", miseConfig)
 	return nil
 }
 
@@ -220,11 +261,11 @@ func (a *App) runDoctor(ctx context.Context) error {
 		fmt.Fprintf(a.options.Out, "✓ estado: %s\n", stateDir)
 	}
 
-	if path, err := a.options.Runner.LookPath("mise"); err != nil {
+	if path, err := a.findCommand("mise"); err != nil {
 		fmt.Fprintln(a.options.Out, "✗ mise: não encontrado")
 		healthy = false
 	} else {
-		output, outputErr := a.options.Runner.Output(ctx, "", "mise", "--version")
+		output, outputErr := a.options.Runner.Output(ctx, "", path, "--version")
 		version, versionErr := extractVersion(output)
 		switch {
 		case outputErr != nil:
@@ -250,6 +291,16 @@ func (a *App) runDoctor(ctx context.Context) error {
 		return errors.New("o diagnóstico encontrou problemas")
 	}
 	return nil
+}
+
+func (a *App) findCommand(name string) (string, error) {
+	if a.options.BinDir != "" {
+		candidate := filepath.Join(a.options.BinDir, name)
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
+			return candidate, nil
+		}
+	}
+	return a.options.Runner.LookPath(name)
 }
 
 func extractVersion(output string) (string, error) {
@@ -317,6 +368,7 @@ Uso:
   zeroot diff               mostra diferenças dos dotfiles
   zeroot apply [--dry-run]  aplica o estado com mise
   zeroot add [--mode MODE] CAMINHO...
+  zeroot trust              confia no mise.toml após revisão
   zeroot doctor             diagnostica a instalação
   zeroot version
 `)

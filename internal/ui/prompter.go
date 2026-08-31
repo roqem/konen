@@ -33,6 +33,7 @@ func (p HuhPrompter) Menu(configured bool) (string, error) {
 		huh.NewOption("Preparar esta máquina", "apply"),
 		huh.NewOption("Ver o estado", "status"),
 		huh.NewOption("Adicionar um arquivo", "add"),
+		huh.NewOption("Confiar no estado após revisar", "trust"),
 		huh.NewOption("Diagnosticar problemas", "doctor"),
 	}
 	if !configured {

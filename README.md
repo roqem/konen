@@ -13,8 +13,29 @@ private configuration format for your machine.
 
 ## Status
 
-Pre-alpha. The state format and the first local workflow are implemented, but
-there is no published release or one-line installer yet.
+Pre-alpha. The state format, local workflow and release infrastructure are
+implemented, but there is no published release yet.
+
+## Installation
+
+After the first public release, the complete interactive entry point will be:
+
+```console
+curl -fsSL https://raw.githubusercontent.com/roqem/zeroot/main/install.sh | sh && ~/.local/bin/zeroot
+```
+
+The installer uses no sudo, verifies release checksums and installs a compatible
+mise beside Zeroot when necessary. To inspect the script before executing it:
+
+```console
+curl -fsSLO https://raw.githubusercontent.com/roqem/zeroot/main/install.sh
+less install.sh
+sh install.sh
+~/.local/bin/zeroot
+```
+
+See [docs/distribution.md](docs/distribution.md) for version pinning, mirrors,
+artifact attestations and the trust model.
 
 ## Commands
 
@@ -23,6 +44,7 @@ as small commands for scripts and recovery environments:
 
 ```console
 zeroot init ~/my-machine --git
+zeroot trust
 zeroot add ~/.zshrc
 zeroot status
 zeroot diff
@@ -35,7 +57,12 @@ An existing state repository can be cloned directly:
 
 ```console
 zeroot init --from git@github.com:you/my-machine.git
+less ~/.local/share/zeroot/state/mise.toml
+zeroot trust
 ```
+
+Fresh state created by Zeroot is trusted automatically. Existing folders and
+cloned repositories require an explicit `zeroot trust` after inspection.
 
 ## State
 

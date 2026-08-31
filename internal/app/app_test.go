@@ -78,11 +78,19 @@ func TestInitAndApply(t *testing.T) {
 
 	want := runCall{
 		dir:  stateDir,
-		name: "mise",
+		name: "/bin/mise",
 		args: []string{"-C", stateDir, "bootstrap", "--yes"},
 	}
-	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1], want) {
-		t.Fatalf("runs = %#v, want second call %#v", runner.runs, want)
+	if len(runner.runs) != 3 || !reflect.DeepEqual(runner.runs[2], want) {
+		t.Fatalf("runs = %#v, want final call %#v", runner.runs, want)
+	}
+	wantTrust := runCall{
+		dir:  stateDir,
+		name: "/bin/mise",
+		args: []string{"trust", filepath.Join(stateDir, "mise.toml")},
+	}
+	if !reflect.DeepEqual(runner.runs[1], wantTrust) {
+		t.Fatalf("runs = %#v, want trust call %#v", runner.runs, wantTrust)
 	}
 	if _, err := os.Stat(filepath.Join(stateDir, "mise.toml")); err != nil {
 		t.Fatalf("mise.toml missing: %v", err)
@@ -138,7 +146,7 @@ func TestAddPinsTheStateConfig(t *testing.T) {
 		"--mode", "copy",
 		"/tmp/example",
 	}
-	if len(runner.runs) != 1 || !reflect.DeepEqual(runner.runs[0].args, want) {
+	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1].args, want) {
 		t.Fatalf("mise args = %#v, want %#v", runner.runs, want)
 	}
 }
@@ -167,8 +175,46 @@ func TestDiffUsesNonMutatingMisePreview(t *testing.T) {
 		"-C", stateDir,
 		"bootstrap", "dotfiles", "apply", "--dry-run",
 	}
-	if len(runner.runs) != 1 || !reflect.DeepEqual(runner.runs[0].args, want) {
+	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1].args, want) {
 		t.Fatalf("mise args = %#v, want %#v", runner.runs, want)
+	}
+}
+
+func TestExistingStateNeedsExplicitTrust(t *testing.T) {
+	root := t.TempDir()
+	stateDir := filepath.Join(root, "state")
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(stateDir, "mise.toml"), []byte("min_version = \"2026.8.14\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
+	application := New(Options{
+		ConfigPath: filepath.Join(root, "config.toml"),
+		HomeDir:    root,
+		Out:        &bytes.Buffer{},
+		Err:        &bytes.Buffer{},
+		Runner:     runner,
+		Prompter:   unusedPrompter{},
+	})
+
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	if len(runner.runs) != 0 {
+		t.Fatalf("existing state was trusted implicitly: %#v", runner.runs)
+	}
+	if err := application.Run(context.Background(), []string{"trust"}); err != nil {
+		t.Fatal(err)
+	}
+	want := runCall{
+		dir:  stateDir,
+		name: "/bin/mise",
+		args: []string{"trust", filepath.Join(stateDir, "mise.toml")},
+	}
+	if len(runner.runs) != 1 || !reflect.DeepEqual(runner.runs[0], want) {
+		t.Fatalf("runs = %#v, want %#v", runner.runs, want)
 	}
 }
 
@@ -191,5 +237,25 @@ func TestVersionComparison(t *testing.T) {
 
 	if got, err := extractVersion("2026.8.14 linux-x64 (2026-08-26)"); err != nil || got != "2026.8.14" {
 		t.Fatalf("extractVersion() = %q, %v", got, err)
+	}
+}
+
+func TestFindCommandPrefersSiblingBinary(t *testing.T) {
+	binDir := t.TempDir()
+	misePath := filepath.Join(binDir, "mise")
+	if err := os.WriteFile(misePath, []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	application := New(Options{
+		BinDir: binDir,
+		Runner: &fakeRunner{paths: map[string]string{"mise": "/usr/bin/mise"}},
+	})
+
+	got, err := application.findCommand("mise")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != misePath {
+		t.Fatalf("findCommand() = %q, want %q", got, misePath)
 	}
 }
