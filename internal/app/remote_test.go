@@ -94,6 +94,11 @@ func TestInitRetriesPrivateGitHubCloneWithMiseProvidedCLI(t *testing.T) {
 	if cloneAttempts != 2 {
 		t.Fatalf("clone attempts = %d, want 2", cloneAttempts)
 	}
+	for _, call := range runner.runs {
+		if call.name == "git" && !reflect.DeepEqual(call.environment, []string{"GIT_TERMINAL_PROMPT=0"}) {
+			t.Fatalf("assisted clone environment = %#v", call.environment)
+		}
+	}
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		t.Fatal(err)

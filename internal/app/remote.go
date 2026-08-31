@@ -25,7 +25,11 @@ func (a *App) cloneRemoteState(ctx context.Context, input, destination string) e
 	if err != nil {
 		return err
 	}
-	cloneErr := a.state.Clone(ctx, source.cloneURL, destination)
+	clone := a.state.Clone
+	if source.githubRepository != "" {
+		clone = a.state.CloneWithoutPrompt
+	}
+	cloneErr := clone(ctx, source.cloneURL, destination)
 	if cloneErr == nil || source.githubRepository == "" {
 		return cloneErr
 	}
@@ -37,7 +41,7 @@ func (a *App) cloneRemoteState(ctx context.Context, input, destination string) e
 	if err := a.authenticateGitHub(ctx, source.githubRepository); err != nil {
 		return fmt.Errorf("clone inicial: %v; autenticação no GitHub: %w", cloneErr, err)
 	}
-	if err := a.state.Clone(ctx, source.cloneURL, destination); err != nil {
+	if err := clone(ctx, source.cloneURL, destination); err != nil {
 		return fmt.Errorf("clone após autenticação no GitHub: %w", err)
 	}
 	return nil

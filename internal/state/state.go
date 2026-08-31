@@ -89,6 +89,14 @@ func (s Service) PrepareLocal(ctx context.Context, path string, initializeGit bo
 }
 
 func (s Service) Clone(ctx context.Context, remote, path string) error {
+	return s.clone(ctx, remote, path, nil)
+}
+
+func (s Service) CloneWithoutPrompt(ctx context.Context, remote, path string) error {
+	return s.clone(ctx, remote, path, []string{"GIT_TERMINAL_PROMPT=0"})
+}
+
+func (s Service) clone(ctx context.Context, remote, path string, environment []string) error {
 	if remote == "" {
 		return errors.New("a origem Git não pode ser vazia")
 	}
@@ -107,8 +115,14 @@ func (s Service) Clone(ctx context.Context, remote, path string) error {
 		return err
 	}
 
-	if err := s.Runner.Run(ctx, "", "git", "clone", "--", remote, path); err != nil {
-		return fmt.Errorf("git clone: %w", err)
+	var cloneErr error
+	if len(environment) == 0 {
+		cloneErr = s.Runner.Run(ctx, "", "git", "clone", "--", remote, path)
+	} else {
+		cloneErr = s.Runner.RunEnv(ctx, "", environment, "git", "clone", "--", remote, path)
+	}
+	if cloneErr != nil {
+		return fmt.Errorf("git clone: %w", cloneErr)
 	}
 	if _, err := os.Stat(filepath.Join(path, "mise.toml")); err != nil {
 		return fmt.Errorf("o repositório foi clonado, mas não contém mise.toml: %w", err)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -23,6 +24,10 @@ func (f *fakeRunner) LookPath(name string) (string, error) {
 func (f *fakeRunner) Run(_ context.Context, dir, name string, args ...string) error {
 	f.runs = append(f.runs, append([]string{dir, name}, args...))
 	return nil
+}
+
+func (f *fakeRunner) RunEnv(ctx context.Context, dir string, _ []string, name string, args ...string) error {
+	return f.Run(ctx, dir, name, args...)
 }
 
 func (f *fakeRunner) Output(_ context.Context, _, _ string, _ ...string) (string, error) {
@@ -80,4 +85,33 @@ func TestResolvePathExpandsHome(t *testing.T) {
 	if got != "/home/tester/machine" {
 		t.Fatalf("ResolvePath() = %q", got)
 	}
+}
+
+func TestCloneWithoutPromptDisablesGitTerminalPrompts(t *testing.T) {
+	runner := &environmentRunner{}
+	path := filepath.Join(t.TempDir(), "state")
+	service := Service{Runner: runner}
+
+	if err := service.CloneWithoutPrompt(context.Background(), "https://github.com/example/state.git", path); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(runner.environment, []string{"GIT_TERMINAL_PROMPT=0"}) {
+		t.Fatalf("clone environment = %#v", runner.environment)
+	}
+}
+
+type environmentRunner struct {
+	fakeRunner
+	environment []string
+}
+
+func (r *environmentRunner) RunEnv(ctx context.Context, dir string, environment []string, name string, args ...string) error {
+	r.environment = append([]string(nil), environment...)
+	if err := os.MkdirAll(args[len(args)-1], 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(args[len(args)-1], "mise.toml"), []byte("[tools]\n"), 0o644); err != nil {
+		return err
+	}
+	return r.Run(ctx, dir, name, args...)
 }

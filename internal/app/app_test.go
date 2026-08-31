@@ -17,9 +17,10 @@ import (
 )
 
 type runCall struct {
-	dir  string
-	name string
-	args []string
+	dir         string
+	environment []string
+	name        string
+	args        []string
 }
 
 type fakeRunner struct {
@@ -39,6 +40,18 @@ func (f *fakeRunner) LookPath(name string) (string, error) {
 
 func (f *fakeRunner) Run(_ context.Context, dir, name string, args ...string) error {
 	call := runCall{dir: dir, name: name, args: append([]string(nil), args...)}
+	f.runs = append(f.runs, call)
+	if f.runHook != nil {
+		return f.runHook(call)
+	}
+	return nil
+}
+
+func (f *fakeRunner) RunEnv(_ context.Context, dir string, environment []string, name string, args ...string) error {
+	call := runCall{
+		dir: dir, environment: append([]string(nil), environment...),
+		name: name, args: append([]string(nil), args...),
+	}
 	f.runs = append(f.runs, call)
 	if f.runHook != nil {
 		return f.runHook(call)
