@@ -162,11 +162,12 @@ before `konen apply`; Konen does not keep a second, hidden installation list.
 
 Custom behavior remains native mise state. Put directly invoked utilities in
 `scripts/bin`, executable installer tasks in `mise-tasks/install`, and select
-automatic installers through `[tasks.bootstrap].depends`. Konen hashes the
-contents and executable modes of `mise.toml`, every recognized mise file-task
-directory and `scripts/bin`; changing any of them blocks state-backed commands
-until `konen trust` is run again. Symbolic links are refused on this executable
-surface. See [docs/automation.md](docs/automation.md).
+automatic installers through sequential task references in `[tasks.bootstrap]`.
+Konen hashes the contents and executable modes of `mise.toml`, every recognized
+mise file-task directory and `scripts/bin`; changing any of them blocks
+state-backed commands until `konen trust` is run again. Symbolic links are
+refused on this executable surface. See
+[docs/automation.md](docs/automation.md).
 
 ## Development
 

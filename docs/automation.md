@@ -48,8 +48,14 @@ machine bootstrap, declare the dependency in `mise.toml`:
 
 ```toml
 [tasks.bootstrap]
-depends = ["install:example"]
+run = [
+  { task = "install:example" },
+]
 ```
+
+Use sequential task references for installers that invoke a system package
+manager. Mise runs ordinary task dependencies in parallel, which would make
+multiple APT installers compete for the same lock.
 
 `konen status` identifies the task and its source file. `konen plan` delegates
 to `mise bootstrap --dry-run`, which prints the selected file-task command
