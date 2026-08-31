@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -45,21 +46,41 @@ func NewHuhPrompter(in io.Reader, out io.Writer) HuhPrompter {
 	return HuhPrompter{in: in, out: out}
 }
 
+func IsUserAborted(err error) bool {
+	return errors.Is(err, huh.ErrUserAborted)
+}
+
+func cancelKeyMap() *huh.KeyMap {
+	keyMap := huh.NewDefaultKeyMap()
+	keyMap.Quit.SetKeys("ctrl+c", "esc")
+	keyMap.Quit.SetHelp("esc", "sair")
+	return keyMap
+}
+
+func menuKeyMap() *huh.KeyMap {
+	keyMap := cancelKeyMap()
+	keyMap.Quit.SetKeys("ctrl+c", "esc", "q", "Q")
+	keyMap.Quit.SetHelp("q/esc", "sair")
+	return keyMap
+}
+
 func (p HuhPrompter) Menu(configured bool) (string, error) {
 	var action string
 	options := []huh.Option[string]{
-		huh.NewOption("Revisar o que mudaria", "plan"),
-		huh.NewOption("Preparar esta máquina", "apply"),
-		huh.NewOption("Abrir um projeto", "dev"),
-		huh.NewOption("Ver tudo configurado", "status"),
-		huh.NewOption("Adicionar um arquivo", "add"),
-		huh.NewOption("Confiar no estado após revisar", "trust"),
-		huh.NewOption("Diagnosticar problemas", "doctor"),
+		huh.NewOption(CommandLabel("plan", "revisar o que mudaria", 13), "plan"),
+		huh.NewOption(CommandLabel("apply", "preparar esta máquina", 13), "apply"),
+		huh.NewOption(CommandLabel("dev", "abrir um projeto", 13), "dev"),
+		huh.NewOption(CommandLabel("status", "ver tudo configurado", 13), "status"),
+		huh.NewOption(CommandLabel("dotfile add", "adicionar um arquivo de configuração", 13), "__dotfile_add"),
+		huh.NewOption(CommandLabel("trust", "confiar no estado após revisar", 13), "trust"),
+		huh.NewOption(CommandLabel("doctor", "diagnosticar problemas", 13), "doctor"),
+		huh.NewOption(CommandLabel("q", "sair", 13), "__exit"),
 	}
 	if !configured {
 		options = []huh.Option[string]{
-			huh.NewOption("Configurar o Konen", "init"),
-			huh.NewOption("Diagnosticar problemas", "doctor"),
+			huh.NewOption(CommandLabel("init", "configurar o Konen", 8), "init"),
+			huh.NewOption(CommandLabel("doctor", "diagnosticar problemas", 8), "doctor"),
+			huh.NewOption(CommandLabel("q", "sair", 8), "__exit"),
 		}
 	}
 
@@ -68,7 +89,7 @@ func (p HuhPrompter) Menu(configured bool) (string, error) {
 			Title("Konen — do zero à sua máquina").
 			Options(options...).
 			Value(&action),
-	)).WithInput(p.in).WithOutput(p.out)
+	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(menuKeyMap())
 	return action, form.Run()
 }
 
@@ -84,7 +105,7 @@ func (p HuhPrompter) Init(defaultPath string) (InitAnswer, error) {
 				huh.NewOption("Clonar um repositório Git", "remote"),
 			).
 			Value(&source),
-	)).WithInput(p.in).WithOutput(p.out)
+	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
 	if err := first.Run(); err != nil {
 		return InitAnswer{}, err
 	}
@@ -106,15 +127,15 @@ func (p HuhPrompter) Init(defaultPath string) (InitAnswer, error) {
 		)
 	}
 
-	form := huh.NewForm(huh.NewGroup(fields...)).WithInput(p.in).WithOutput(p.out)
+	form := huh.NewForm(huh.NewGroup(fields...)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
 	return answer, form.Run()
 }
 
 func (p HuhPrompter) AddTarget() (string, error) {
 	var target string
 	form := huh.NewForm(huh.NewGroup(
-		huh.NewInput().Title("Arquivo ou diretório para adicionar").Value(&target),
-	)).WithInput(p.in).WithOutput(p.out)
+		huh.NewInput().Title("Dotfile para adicionar").Value(&target),
+	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
 	return target, form.Run()
 }
 
@@ -129,7 +150,7 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 		huh.NewConfirm().
 			Title("Manter a aba que executou `konen dev`?").
 			Affirmative("Manter").Negative("Fechar").Value(&answer.KeepInvokingTab),
-	)).WithInput(p.in).WithOutput(p.out)
+	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
 	if err := identity.Run(); err != nil {
 		return ProjectAnswer{}, err
 	}
@@ -149,7 +170,7 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 			huh.NewConfirm().
 				Title("Manter esta aba?").
 				Affirmative("Sim").Negative("Remover").Value(&keep),
-		)).WithInput(p.in).WithOutput(p.out)
+		)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
 		if err := form.Run(); err != nil {
 			return ProjectAnswer{}, err
 		}
@@ -166,7 +187,7 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 			huh.NewConfirm().
 				Title("Adicionar outra aba?").
 				Affirmative("Sim").Negative("Não").Value(&addAnother),
-		)).WithInput(p.in).WithOutput(p.out)
+		)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
 		if err := form.Run(); err != nil {
 			return ProjectAnswer{}, err
 		}
@@ -189,7 +210,7 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 			huh.NewConfirm().
 				Title("Adicionar mais uma aba?").
 				Affirmative("Sim").Negative("Não").Value(&addAnother),
-		)).WithInput(p.in).WithOutput(p.out)
+		)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
 		if err := form.Run(); err != nil {
 			return ProjectAnswer{}, err
 		}
@@ -216,6 +237,6 @@ func (p HuhPrompter) ChooseProject(names []string) (string, error) {
 	var selected string
 	form := huh.NewForm(huh.NewGroup(
 		huh.NewSelect[string]().Title("Qual projeto deseja abrir?").Options(options...).Value(&selected),
-	)).WithInput(p.in).WithOutput(p.out)
+	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
 	return selected, form.Run()
 }

@@ -212,6 +212,7 @@ esac
 	completion := runCommand(t, root, environment, konen, "completion", "zsh")
 	assertContains(t, completion, "#compdef konen")
 	assertContains(t, completion, "__complete projects")
+	assertContains(t, completion, "dotfile")
 
 	manifestPath := filepath.Join(stateDir, "projects", "sample.toml")
 	manifest := `version = 1
@@ -238,6 +239,9 @@ hold = true
 	assertContains(t, output, "Projeto aprovado: sample")
 	output = runCommand(t, root, environment, konen, "projects")
 	assertContains(t, output, "aprovado")
+	output = runCommand(t, root, environment, konen, "sample", "--dry-run")
+	assertContains(t, output, "Projeto: sample")
+	assertContains(t, output, "Aprovação local: válida")
 	output = runCommand(t, projectDir, environment, konen, "dev", "--dry-run")
 	assertContains(t, output, "Projeto: sample")
 	assertContains(t, output, "Aprovação local: válida")

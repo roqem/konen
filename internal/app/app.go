@@ -52,6 +52,14 @@ func New(options Options) *App {
 }
 
 func (a *App) Run(ctx context.Context, args []string) error {
+	err := a.run(ctx, args)
+	if ui.IsUserAborted(err) {
+		return nil
+	}
+	return err
+}
+
+func (a *App) run(ctx context.Context, args []string) error {
 	if len(args) == 0 {
 		if !a.options.Interactive {
 			a.printHelp()
@@ -63,7 +71,7 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		return a.Run(ctx, []string{action})
+		return a.run(ctx, []string{action})
 	}
 
 	switch args[0] {
@@ -77,8 +85,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return a.runMise(ctx, []string{"bootstrap", "dotfiles", "diff"})
 	case "apply":
 		return a.runApply(ctx, args[1:])
+	case "dotfile":
+		return a.runDotfile(ctx, args[1:])
 	case "add":
-		return a.runAdd(ctx, args[1:])
+		return errors.New("`konen add` é ambíguo; use `konen project add [DIR]` para projetos ou `konen dotfile add CAMINHO...` para arquivos de configuração")
 	case "trust":
 		return a.runTrust(ctx, args[1:])
 	case "doctor":
@@ -94,6 +104,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return a.runProject(ctx, []string{"list"})
 	case "completion":
 		return a.runCompletion(args[1:])
+	case "__dotfile_add":
+		return a.runDotfile(ctx, []string{"add"})
+	case "__exit":
+		return nil
 	case "__complete":
 		return a.runInternalComplete(args[1:])
 	case "version", "--version", "-v":
@@ -103,8 +117,7 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		a.printHelp()
 		return nil
 	default:
-		a.printHelp()
-		return fmt.Errorf("comando desconhecido: %s", args[0])
+		return a.runProjectShortcut(ctx, args)
 	}
 }
 
@@ -198,8 +211,18 @@ func (a *App) runApply(ctx context.Context, args []string) error {
 	return a.runMise(ctx, miseArgs)
 }
 
-func (a *App) runAdd(ctx context.Context, args []string) error {
-	flags := flag.NewFlagSet("add", flag.ContinueOnError)
+func (a *App) runDotfile(ctx context.Context, args []string) error {
+	if len(args) == 0 {
+		return errors.New("informe uma ação: add")
+	}
+	if args[0] != "add" {
+		return fmt.Errorf("ação de dotfile desconhecida: %s", args[0])
+	}
+	return a.runDotfileAdd(ctx, args[1:])
+}
+
+func (a *App) runDotfileAdd(ctx context.Context, args []string) error {
+	flags := flag.NewFlagSet("dotfile add", flag.ContinueOnError)
 	flags.SetOutput(a.options.Err)
 	mode := flags.String("mode", "", "modo do dotfile: symlink, copy ou template")
 	if err := flags.Parse(args); err != nil {
@@ -208,7 +231,7 @@ func (a *App) runAdd(ctx context.Context, args []string) error {
 	targets := flags.Args()
 	if len(targets) == 0 {
 		if !a.options.Interactive {
-			return errors.New("informe ao menos um arquivo ou diretório")
+			return errors.New("informe ao menos um arquivo de configuração")
 		}
 		target, err := a.options.Prompter.AddTarget()
 		if err != nil {
@@ -218,6 +241,13 @@ func (a *App) runAdd(ctx context.Context, args []string) error {
 			return errors.New("o caminho não pode ser vazio")
 		}
 		targets = []string{target}
+	}
+	for index, target := range targets {
+		resolved, err := a.resolveDotfileTarget(target)
+		if err != nil {
+			return err
+		}
+		targets[index] = resolved
 	}
 
 	stateDir, err := a.loadState()
@@ -233,6 +263,20 @@ func (a *App) runAdd(ctx context.Context, args []string) error {
 	}
 	miseArgs = append(miseArgs, targets...)
 	return a.runMise(ctx, miseArgs)
+}
+
+func (a *App) resolveDotfileTarget(target string) (string, error) {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return "", errors.New("o caminho do dotfile não pode ser vazio")
+	}
+	if target == "~" || strings.HasPrefix(target, "~/") {
+		return state.ResolvePath(target, a.options.HomeDir)
+	}
+	if filepath.IsAbs(target) {
+		return filepath.Clean(target), nil
+	}
+	return filepath.Abs(filepath.Join(a.options.WorkDir, target))
 }
 
 func (a *App) runMise(ctx context.Context, args []string) error {
@@ -381,28 +425,49 @@ func (a *App) loadState() (string, error) {
 }
 
 func (a *App) printHelp() {
-	fmt.Fprint(a.options.Out, `Konen — do zero à sua máquina
+	fmt.Fprintln(a.options.Out, "Konen — do zero à sua máquina")
+	a.printCommandGroup("Início rápido", [][2]string{
+		{"konen", "abre o menu interativo"},
+		{"konen NOME", "abre um projeto cadastrado"},
+		{"konen help", "mostra esta ajuda"},
+	})
+	a.printCommandGroup("Máquina", [][2]string{
+		{"konen init [--git] [DIR]", "configura ou cria o estado"},
+		{"konen init --from URL [DIR]", "clona um estado existente"},
+		{"konen status", "mostra tudo que o estado declara"},
+		{"konen plan", "mostra exatamente o que mudaria"},
+		{"konen apply [--dry-run]", "aplica o estado com mise"},
+		{"konen trust", "confia no mise.toml após revisão"},
+		{"konen doctor", "diagnostica a instalação"},
+	})
+	a.printCommandGroup("Projetos", [][2]string{
+		{"konen projects", "lista os projetos cadastrados"},
+		{"konen project add [DIR]", "cadastra um projeto e suas abas"},
+		{"konen project edit NOME", "edita um projeto pelo assistente"},
+		{"konen project show NOME", "mostra o manifesto de um projeto"},
+		{"konen project trust NOME", "aprova os comandos após revisão"},
+		{"konen dev [NOME] [--dry-run]", "abre ou inspeciona a sessão do projeto"},
+	})
+	a.printCommandGroup("Arquivos de configuração", [][2]string{
+		{"konen dotfile add CAMINHO...", "adiciona dotfiles ao estado"},
+		{"konen dotfile add --mode MODO CAMINHO...", "usa symlink, copy ou template"},
+		{"konen diff", "mostra diferenças dos dotfiles"},
+	})
+	a.printCommandGroup("Shell", [][2]string{
+		{"konen completion zsh|bash|fish", "gera o autocomplete"},
+		{"konen version", "mostra a versão instalada"},
+	})
+}
 
-Uso:
-  konen                    abre o menu interativo
-  konen init [--git] [DIR] configura ou cria o estado
-  konen init --from URL [DIR]
-  konen status             mostra tudo que o estado declara
-  konen plan               mostra exatamente o que mudaria
-  konen diff               mostra diferenças dos dotfiles
-  konen apply [--dry-run]  aplica o estado com mise
-  konen add [--mode MODE] CAMINHO...
-  konen project add [DIR] cadastra um projeto e suas abas
-  konen project edit NOME edita um projeto pelo assistente
-  konen projects           lista os projetos cadastrados
-  konen project list      alias compatível de konen projects
-  konen project show NOME mostra o manifesto do projeto
-  konen project trust NOME aprova os comandos após revisão
-  konen dev [NOME]        abre o projeto em abas do Kitty
-  konen dev [NOME] --dry-run
-  konen trust              confia no mise.toml após revisão
-  konen doctor             diagnostica a instalação
-  konen completion SHELL   gera autocomplete para zsh, bash ou fish
-  konen version
-`)
+func (a *App) printCommandGroup(title string, commands [][2]string) {
+	fmt.Fprintf(a.options.Out, "\n%s:\n", title)
+	width := 0
+	for _, command := range commands {
+		if len(command[0]) > width {
+			width = len(command[0])
+		}
+	}
+	for _, command := range commands {
+		fmt.Fprintf(a.options.Out, "  %s\n", ui.CommandLabel(command[0], command[1], width))
+	}
 }

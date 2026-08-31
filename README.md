@@ -69,7 +69,7 @@ as small commands for scripts and recovery environments:
 ```console
 konen init --git ~/home
 konen trust
-konen add ~/.zshrc
+konen dotfile add ~/.zshrc
 konen status
 konen plan
 konen diff
@@ -77,6 +77,9 @@ konen apply --dry-run
 konen apply
 konen doctor
 ```
+
+Menu entries show the corresponding command. Press `q`, Escape or Ctrl+C to
+leave without treating cancellation as an error.
 
 Projects and their terminal tabs live in the same central state, rather than
 being scattered as Kitty files across source repositories:
@@ -90,7 +93,8 @@ konen dev
 ```
 
 `konen dev` infers the project from the current directory. A name is useful
-from anywhere (`konen dev my-app`). Inside Kitty it opens tabs in the current OS
+from anywhere (`konen dev my-app`); a registered project can also be opened by
+the short form `konen my-app`. Inside Kitty it opens tabs in the current OS
 window; outside Kitty it starts a native Kitty session in a new window. Project
 commands must be approved locally and any out-of-band manifest change revokes
 that approval. See [docs/projects.md](docs/projects.md).

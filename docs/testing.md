@@ -93,6 +93,7 @@ cd ~/Projects/example
 konen project add
 konen projects
 konen dev --dry-run
+konen example --dry-run
 ```
 
 Create at least one shell-only tab in the guided form. The project must appear

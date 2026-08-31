@@ -92,6 +92,25 @@ func (a *App) runProject(ctx context.Context, args []string) error {
 	}
 }
 
+func (a *App) runProjectShortcut(ctx context.Context, args []string) error {
+	name := args[0]
+	if err := project.ValidateName(name); err != nil {
+		return fmt.Errorf("comando desconhecido: %s; execute `konen help`", name)
+	}
+	stateDir, err := a.loadState()
+	if err != nil {
+		return err
+	}
+	store := project.Store{StateDir: stateDir, HomeDir: a.options.HomeDir}
+	if _, _, err := store.Load(name); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("%q não é um comando nem um projeto cadastrado; consulte `konen projects` ou cadastre-o com `konen project add [DIR]`", name)
+		}
+		return err
+	}
+	return a.runDev(ctx, args)
+}
+
 func (a *App) runProjectAdd(_ context.Context, store project.Store, args []string) error {
 	if len(args) > 1 {
 		return errors.New("project add aceita no máximo um caminho")

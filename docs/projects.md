@@ -23,11 +23,14 @@ Use the project from its directory or by name:
 konen projects
 konen dev
 konen dev my-app
+konen my-app
 konen dev my-app --dry-run
 ```
 
-`konen projects` is the canonical list command. `konen project list` remains
-available as a compatibility alias beside the singular project actions.
+`konen NAME` is the short form of `konen dev NAME` for a registered project;
+it never scans arbitrary folders or registers one implicitly. `konen projects`
+is the canonical list command. `konen project list` remains available as a
+compatibility alias beside the singular project actions.
 
 Inside Kitty, Konen uses remote control to add tabs to the same OS window and
 then focuses the first created tab. The invoking tab remains open by default.

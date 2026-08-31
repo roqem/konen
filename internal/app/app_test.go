@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/huh/v2"
 	"github.com/roqem/konen/internal/execx"
 	"github.com/roqem/konen/internal/project"
 	"github.com/roqem/konen/internal/ui"
@@ -64,6 +65,16 @@ func (unusedPrompter) ChooseProject([]string) (string, error) {
 type projectPrompter struct {
 	unusedPrompter
 	answer ui.ProjectAnswer
+}
+
+type menuPrompter struct {
+	unusedPrompter
+	action string
+	err    error
+}
+
+func (p menuPrompter) Menu(bool) (string, error) {
+	return p.action, p.err
 }
 
 func (p projectPrompter) Project(ui.ProjectAnswer) (ui.ProjectAnswer, error) {
@@ -136,7 +147,7 @@ func TestStatusRequiresMise(t *testing.T) {
 	}
 }
 
-func TestAddPinsTheStateConfig(t *testing.T) {
+func TestDotfileAddPinsTheStateConfig(t *testing.T) {
 	root := t.TempDir()
 	stateDir := filepath.Join(root, "state")
 	configPath := filepath.Join(root, "config.toml")
@@ -153,7 +164,7 @@ func TestAddPinsTheStateConfig(t *testing.T) {
 	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
 		t.Fatal(err)
 	}
-	if err := application.Run(context.Background(), []string{"add", "--mode", "copy", "/tmp/example"}); err != nil {
+	if err := application.Run(context.Background(), []string{"dotfile", "add", "--mode", "copy", "/tmp/example"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -166,6 +177,44 @@ func TestAddPinsTheStateConfig(t *testing.T) {
 	}
 	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1].args, want) {
 		t.Fatalf("mise args = %#v, want %#v", runner.runs, want)
+	}
+}
+
+func TestDotfileAddResolvesRelativePathFromWorkingDirectory(t *testing.T) {
+	root := t.TempDir()
+	workDir := filepath.Join(root, "workspace")
+	stateDir := filepath.Join(root, "state")
+	if err := os.MkdirAll(workDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
+	application := New(Options{
+		ConfigPath: filepath.Join(root, "config.toml"),
+		HomeDir:    root, WorkDir: workDir,
+		Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, Runner: runner, Prompter: unusedPrompter{},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	if err := application.Run(context.Background(), []string{"dotfile", "add", "config/example.toml"}); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(workDir, "config", "example.toml")
+	if got := runner.runs[1].args[len(runner.runs[1].args)-1]; got != want {
+		t.Fatalf("relative target = %q, want %q", got, want)
+	}
+}
+
+func TestLegacyAddExplainsProjectAndDotfileCommands(t *testing.T) {
+	application := New(Options{Out: &bytes.Buffer{}, Err: &bytes.Buffer{}})
+	err := application.Run(context.Background(), []string{"add", "somewhere"})
+	if err == nil {
+		t.Fatal("ambiguous add should fail")
+	}
+	for _, fragment := range []string{"é ambíguo", "konen project add", "konen dotfile add"} {
+		if !strings.Contains(err.Error(), fragment) {
+			t.Fatalf("add error is missing %q: %v", fragment, err)
+		}
 	}
 }
 
@@ -251,6 +300,109 @@ func TestProjectsListsThroughPluralCommand(t *testing.T) {
 		if !strings.Contains(out.String(), fragment) {
 			t.Fatalf("projects output is missing %q: %s", fragment, out.String())
 		}
+	}
+}
+
+func TestRegisteredProjectNameIsDevShortcut(t *testing.T) {
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "sample")
+	stateDir := filepath.Join(root, "state")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
+	var out bytes.Buffer
+	application := New(Options{
+		ConfigPath: filepath.Join(root, "config.toml"),
+		HomeDir:    root, WorkDir: root,
+		Out: &out, Err: &out, Runner: runner, Prompter: unusedPrompter{},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	store := project.Store{StateDir: stateDir, HomeDir: root}
+	if _, err := store.Save("sample", project.Manifest{
+		Version: 1, Path: projectDir, Tabs: []project.Tab{{Title: "Terminal"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	runner.runs = nil
+
+	if err := application.Run(context.Background(), []string{"sample", "--dry-run"}); err != nil {
+		t.Fatal(err)
+	}
+	assertOutputContains(t, out.String(), "Projeto: sample")
+	assertOutputContains(t, out.String(), "Aprovação local: pendente")
+	if len(runner.runs) != 0 {
+		t.Fatalf("shortcut dry-run launched commands: %#v", runner.runs)
+	}
+}
+
+func TestUnknownProjectShortcutGivesFocusedGuidance(t *testing.T) {
+	root := t.TempDir()
+	stateDir := filepath.Join(root, "state")
+	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
+	var out bytes.Buffer
+	application := New(Options{
+		ConfigPath: filepath.Join(root, "config.toml"), HomeDir: root,
+		Out: &out, Err: &out, Runner: runner, Prompter: unusedPrompter{},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+
+	err := application.Run(context.Background(), []string{"unknown-app"})
+	if err == nil {
+		t.Fatal("unknown shortcut should fail")
+	}
+	for _, fragment := range []string{"não é um comando nem um projeto cadastrado", "konen projects", "konen project add"} {
+		if !strings.Contains(err.Error(), fragment) {
+			t.Fatalf("shortcut error is missing %q: %v", fragment, err)
+		}
+	}
+	if out.Len() != 0 {
+		t.Fatalf("unknown shortcut printed the full help unexpectedly: %q", out.String())
+	}
+}
+
+func TestInteractiveExitAndAbortAreClean(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		prompter ui.Prompter
+	}{
+		{name: "exit option", prompter: menuPrompter{action: "__exit"}},
+		{name: "keyboard abort", prompter: menuPrompter{err: huh.ErrUserAborted}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			application := New(Options{
+				ConfigPath: filepath.Join(root, "missing.toml"), HomeDir: root,
+				Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, Runner: &fakeRunner{},
+				Prompter: test.prompter, Interactive: true,
+			})
+			if err := application.Run(context.Background(), nil); err != nil {
+				t.Fatalf("interactive exit returned error: %v", err)
+			}
+		})
+	}
+}
+
+func TestHelpGroupsCommandsAndSeparatesAddOperations(t *testing.T) {
+	var out bytes.Buffer
+	application := New(Options{Out: &out})
+	if err := application.Run(context.Background(), []string{"help"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, fragment := range []string{
+		"Início rápido:", "Máquina:", "Projetos:", "Arquivos de configuração:", "Shell:",
+		"konen NOME", "konen project add [DIR]", "konen dotfile add CAMINHO...",
+	} {
+		assertOutputContains(t, out.String(), fragment)
+	}
+	if strings.Contains(out.String(), "\n  konen add ") {
+		t.Fatalf("help still advertises ambiguous add:\n%s", out.String())
 	}
 }
 

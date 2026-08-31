@@ -61,14 +61,14 @@ _konen_projects() {
 }
 
 _konen() {
-  local -a commands project_actions
+  local -a commands dotfile_actions project_actions
   commands=(
     'init:configura ou cria o estado'
     'status:mostra tudo que o estado declara'
     'plan:mostra exatamente o que mudaria'
     'diff:mostra diferenças dos dotfiles'
     'apply:aplica o estado com mise'
-    'add:adiciona um arquivo ou diretório'
+    'dotfile:gerencia arquivos de configuração'
     'projects:lista os projetos cadastrados'
     'project:gerencia projetos e suas sessões'
     'dev:abre um projeto no Kitty'
@@ -77,6 +77,9 @@ _konen() {
     'completion:gera autocomplete para o shell'
     'version:mostra a versão'
     'help:mostra ajuda'
+  )
+  dotfile_actions=(
+    'add:adiciona um dotfile ao estado'
   )
   project_actions=(
     'add:cadastra um projeto'
@@ -88,6 +91,7 @@ _konen() {
 
   if (( CURRENT == 2 )); then
     _describe 'comando' commands
+    _konen_projects
     return
   fi
 
@@ -111,11 +115,23 @@ _konen() {
         '--yes[não pede confirmação]' \
         '--dry-run[mostra o plano sem alterar a máquina]'
       ;;
-    add)
-      _arguments \
-        '(-h --help)'{-h,--help}'[mostra ajuda]' \
-        '--mode=[define o modo do dotfile]:modo:(symlink copy template)' \
-        '*:arquivo ou diretório:_files'
+    dotfile)
+      if (( CURRENT == 2 )); then
+        _describe 'ação' dotfile_actions
+        return
+      fi
+      local action=$words[2]
+      words=($words[2,-1])
+      (( CURRENT-- ))
+      case $action in
+        add)
+          _arguments \
+            '(-h --help)'{-h,--help}'[mostra ajuda]' \
+            '--mode=[define o modo do dotfile]:modo:(symlink copy template)' \
+            '*:arquivo ou diretório:_files'
+          ;;
+        *) _describe 'ação' dotfile_actions ;;
+      esac
       ;;
     dev)
       _arguments \
@@ -141,6 +157,9 @@ _konen() {
         *) _describe 'ação' project_actions ;;
       esac
       ;;
+    *)
+      _arguments '--dry-run[mostra a sessão sem abrir abas]'
+      ;;
   esac
 }
 
@@ -155,7 +174,7 @@ const bashCompletion = `_konen_completion() {
   command="${COMP_WORDS[1]}"
 
   if [[ $COMP_CWORD -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W 'init status plan diff apply add projects project dev trust doctor completion version help' -- "$current") )
+    COMPREPLY=( $(compgen -W "init status plan diff apply dotfile projects project dev trust doctor completion version help $(konen __complete projects 2>/dev/null)" -- "$current") )
     return
   fi
 
@@ -170,12 +189,15 @@ const bashCompletion = `_konen_completion() {
     apply)
       COMPREPLY=( $(compgen -W '--yes --dry-run -h --help' -- "$current") )
       ;;
-    add)
-      if [[ $previous == --mode ]]; then
+    dotfile)
+      action="${COMP_WORDS[2]}"
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W 'add' -- "$current") )
+      elif [[ $action == add && $previous == --mode ]]; then
         COMPREPLY=( $(compgen -W 'symlink copy template' -- "$current") )
-      elif [[ $current == -* ]]; then
+      elif [[ $action == add && $current == -* ]]; then
         COMPREPLY=( $(compgen -W '--mode -h --help' -- "$current") )
-      else
+      elif [[ $action == add ]]; then
         COMPREPLY=( $(compgen -f -- "$current") )
       fi
       ;;
@@ -195,6 +217,9 @@ const bashCompletion = `_konen_completion() {
         COMPREPLY=( $(compgen -W "$(konen __complete projects 2>/dev/null)" -- "$current") )
       fi
       ;;
+    *)
+      COMPREPLY=( $(compgen -W '--dry-run' -- "$current") )
+      ;;
   esac
 }
 
@@ -207,7 +232,7 @@ complete -c konen -n '__fish_use_subcommand' -a status -d 'Mostra tudo que o est
 complete -c konen -n '__fish_use_subcommand' -a plan -d 'Mostra exatamente o que mudaria'
 complete -c konen -n '__fish_use_subcommand' -a diff -d 'Mostra diferenças dos dotfiles'
 complete -c konen -n '__fish_use_subcommand' -a apply -d 'Aplica o estado com mise'
-complete -c konen -n '__fish_use_subcommand' -a add -d 'Adiciona um arquivo ou diretório'
+complete -c konen -n '__fish_use_subcommand' -a dotfile -d 'Gerencia arquivos de configuração'
 complete -c konen -n '__fish_use_subcommand' -a projects -d 'Lista os projetos cadastrados'
 complete -c konen -n '__fish_use_subcommand' -a project -d 'Gerencia projetos e suas sessões'
 complete -c konen -n '__fish_use_subcommand' -a dev -d 'Abre um projeto no Kitty'
@@ -216,11 +241,13 @@ complete -c konen -n '__fish_use_subcommand' -a doctor -d 'Diagnostica a instala
 complete -c konen -n '__fish_use_subcommand' -a completion -d 'Gera autocomplete para o shell'
 complete -c konen -n '__fish_use_subcommand' -a version -d 'Mostra a versão'
 complete -c konen -n '__fish_use_subcommand' -a help -d 'Mostra ajuda'
+complete -c konen -n '__fish_use_subcommand' -a '(konen __complete projects 2>/dev/null)' -d 'Abre o projeto'
 complete -c konen -n '__fish_seen_subcommand_from init' -l git -d 'Inicializa um repositório Git'
 complete -c konen -n '__fish_seen_subcommand_from init' -l from -r -d 'Clona um repositório Git'
 complete -c konen -n '__fish_seen_subcommand_from apply' -l yes -d 'Não pede confirmação'
 complete -c konen -n '__fish_seen_subcommand_from apply' -l dry-run -d 'Mostra o plano sem alterar a máquina'
-complete -c konen -n '__fish_seen_subcommand_from add' -l mode -r -a 'symlink copy template' -d 'Modo do dotfile'
+complete -c konen -n '__fish_seen_subcommand_from dotfile' -a add -d 'Adiciona um dotfile ao estado'
+complete -c konen -n '__fish_seen_subcommand_from dotfile' -l mode -r -a 'symlink copy template' -d 'Modo do dotfile'
 complete -c konen -n '__fish_seen_subcommand_from dev' -l dry-run -d 'Mostra a sessão sem abrir abas'
 complete -c konen -n '__fish_seen_subcommand_from dev' -a '(konen __complete projects 2>/dev/null)' -d 'Projeto'
 complete -c konen -n '__fish_seen_subcommand_from project' -a 'add edit list show trust'

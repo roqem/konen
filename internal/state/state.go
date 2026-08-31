@@ -22,7 +22,7 @@ dotfiles.default_mode = "symlink"
 "~/.config/mise/config.toml" = { source = "mise.toml", mode = "symlink" }
 
 # Declare tools, packages, repositories and managed files here.
-# ` + "`konen add ~/.zshrc`" + ` adds a dotfile without inventing a second format.
+# ` + "`konen dotfile add ~/.zshrc`" + ` adds a dotfile without inventing a second format.
 `
 
 const defaultGitignore = `.env
