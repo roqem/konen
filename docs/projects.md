@@ -13,7 +13,8 @@ konen project add
 
 The guided form asks for a short name, the project directory, an optional shell
 and one or more tabs. An empty command opens a login shell in the project. A
-non-empty command is passed to that shell with `-lc`; `hold = true` asks Kitty
+non-empty command is passed to an interactive login shell with `-lic`, so the
+workspace sees the environment configured in `.zshrc`; `hold = true` asks Kitty
 to open a shell after the command exits.
 
 Use the project from its directory or by name:
@@ -25,9 +26,9 @@ konen dev my-app --dry-run
 ```
 
 Inside Kitty, Konen uses remote control to add tabs to the same OS window and
-then focuses the first created tab. The invoking tab remains open. This requires
-`allow_remote_control yes` in `kitty.conf`. Outside Kitty, Konen renders a
-temporary native session file and opens a new Kitty window.
+then focuses the first created tab. The invoking tab remains open by default.
+This requires `allow_remote_control yes` in `kitty.conf`. Outside Kitty, Konen
+renders a temporary native session file and opens a new Kitty window.
 
 ## Manifest
 
@@ -36,6 +37,7 @@ The guided flow writes `projects/NAME.toml` in the Konen state:
 ```toml
 version = 1
 path = "~/Documents/Projects/my-app"
+keep_invoking_tab = false
 
 [[tabs]]
 title = "Neovim"
@@ -54,6 +56,11 @@ title = "Terminal"
 command = "git status"
 hold = true
 ```
+
+`keep_invoking_tab` defaults to `true` for existing manifests. Setting it to
+`false` closes only the Kitty terminal that invoked `konen dev` after all tabs
+have opened and the first has received focus; if it is the only terminal in its
+tab, Kitty closes that tab as well.
 
 Edit it through the guided form with `konen project edit NAME`. `show`, `list`
 and `--dry-run` are non-mutating inspection commands.

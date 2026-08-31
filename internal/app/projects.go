@@ -105,8 +105,9 @@ func (a *App) runProjectAdd(_ context.Context, store project.Store, args []strin
 	}
 
 	answer, err := a.options.Prompter.Project(ui.ProjectAnswer{
-		Name: strings.ToLower(filepath.Base(resolved)),
-		Path: resolved,
+		Name:            strings.ToLower(filepath.Base(resolved)),
+		Path:            resolved,
+		KeepInvokingTab: true,
 	})
 	if err != nil {
 		return err
@@ -151,7 +152,10 @@ func (a *App) runProjectEdit(_ context.Context, store project.Store, args []stri
 	if err != nil {
 		return err
 	}
-	answer := ui.ProjectAnswer{Name: name, Path: resolved, Shell: manifest.Shell}
+	answer := ui.ProjectAnswer{
+		Name: name, Path: resolved, Shell: manifest.Shell,
+		KeepInvokingTab: manifest.KeepsInvokingTab(),
+	}
 	for _, tab := range manifest.Tabs {
 		answer.Tabs = append(answer.Tabs, ui.ProjectTabAnswer{
 			Title: tab.Title, Command: tab.Command, Hold: tab.Hold,
@@ -195,7 +199,11 @@ func (a *App) manifestFromAnswer(answer ui.ProjectAnswer) (project.Manifest, err
 	if err != nil {
 		return project.Manifest{}, err
 	}
-	manifest := project.Manifest{Version: 1, Path: portable, Shell: answer.Shell}
+	keepInvokingTab := answer.KeepInvokingTab
+	manifest := project.Manifest{
+		Version: 1, Path: portable, Shell: answer.Shell,
+		KeepInvokingTab: &keepInvokingTab,
+	}
 	for _, tab := range answer.Tabs {
 		manifest.Tabs = append(manifest.Tabs, project.Tab{
 			Title: tab.Title, Command: tab.Command, Hold: tab.Hold,
@@ -321,7 +329,7 @@ func (a *App) launchInCurrentKitty(ctx context.Context, name, dir string, manife
 		if tab.Command == "" {
 			launchArgs = append(launchArgs, "-l")
 		} else {
-			launchArgs = append(launchArgs, "-lc", tab.Command)
+			launchArgs = append(launchArgs, "-lic", tab.Command)
 		}
 		output, err := a.options.Runner.Output(ctx, dir, kitten, launchArgs...)
 		if err != nil {
@@ -339,6 +347,11 @@ func (a *App) launchInCurrentKitty(ctx context.Context, name, dir string, manife
 		return fmt.Errorf("as abas foram abertas, mas não foi possível focar a primeira: %w", err)
 	}
 	fmt.Fprintf(a.options.Out, "Projeto aberto na janela atual do Kitty: %s\n", name)
+	if !manifest.KeepsInvokingTab() {
+		if err := a.options.Runner.Run(ctx, dir, kitten, "@", "close-window", "--self", "--no-response"); err != nil {
+			return fmt.Errorf("o projeto foi aberto, mas não foi possível fechar o terminal invocador: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -387,10 +400,18 @@ func (a *App) projectTrust() project.TrustStore {
 
 func (a *App) printProjectPlan(name, dir string, manifest project.Manifest) {
 	destination := "nova janela do Kitty"
-	if a.options.Getenv("KITTY_WINDOW_ID") != "" {
+	insideKitty := a.options.Getenv("KITTY_WINDOW_ID") != ""
+	if insideKitty {
 		destination = "abas na janela atual do Kitty"
 	}
 	fmt.Fprintf(a.options.Out, "Projeto: %s\nPasta: %s\nDestino: %s\n", name, dir, destination)
+	if insideKitty {
+		invokingTab := "manter"
+		if !manifest.KeepsInvokingTab() {
+			invokingTab = "fechar"
+		}
+		fmt.Fprintf(a.options.Out, "Aba invocadora: %s\n", invokingTab)
+	}
 	for index, tab := range manifest.Tabs {
 		command := tab.Command
 		if command == "" {
@@ -417,7 +438,7 @@ func renderKittySession(dir, shell string, manifest project.Manifest) string {
 		if tab.Command == "" {
 			output.WriteString(" -l\n\n")
 		} else {
-			fmt.Fprintf(&output, " -lc %s\n\n", shellQuote(tab.Command))
+			fmt.Fprintf(&output, " -lic %s\n\n", shellQuote(tab.Command))
 		}
 	}
 	output.WriteString("focus_tab 0\n")

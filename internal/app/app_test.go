@@ -329,7 +329,7 @@ func TestDevOpensTabsInCurrentKittyAndFocusesFirst(t *testing.T) {
 	}
 	wantFirst := runCall{
 		dir: projectDir, name: "/bin/kitten",
-		args: []string{"@", "launch", "--self", "--type=tab", "--keep-focus", "--tab-title", "Editor", "--cwd", projectDir, "--add-to-session", "konen-sample", "/bin/zsh", "-lc", "nvim ."},
+		args: []string{"@", "launch", "--self", "--type=tab", "--keep-focus", "--tab-title", "Editor", "--cwd", projectDir, "--add-to-session", "konen-sample", "/bin/zsh", "-lic", "nvim ."},
 	}
 	if !reflect.DeepEqual(runner.runs[1], wantFirst) {
 		t.Fatalf("first launch = %#v, want %#v", runner.runs[1], wantFirst)
@@ -386,9 +386,64 @@ func TestRenderKittySessionQuotesCommands(t *testing.T) {
 	})
 	want := "new_tab 'It'\\''s ready'\n" +
 		"cd '/tmp/project with space'\n" +
-		"launch --hold '/bin/zsh' -lc 'printf '\\''%s'\\'' ok'\n\n" +
+		"launch --hold '/bin/zsh' -lic 'printf '\\''%s'\\'' ok'\n\n" +
 		"focus_tab 0\n"
 	if got != want {
 		t.Fatalf("session =\n%s\nwant =\n%s", got, want)
+	}
+}
+
+func TestDevCanCloseInvokingKittyWindow(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	projectDir := filepath.Join(home, "project")
+	stateDir := filepath.Join(root, "state")
+	configPath := filepath.Join(root, "config", "config.toml")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{
+		paths:   map[string]string{"mise": "/bin/mise", "kitten": "/bin/kitten"},
+		outputs: map[string]string{"/bin/kitten": "51\n"},
+	}
+	application := New(Options{
+		ConfigPath: configPath, HomeDir: home, WorkDir: projectDir,
+		Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, Runner: runner, Prompter: unusedPrompter{},
+		Getenv: func(name string) string {
+			if name == "KITTY_WINDOW_ID" {
+				return "4"
+			}
+			if name == "SHELL" {
+				return "/bin/zsh"
+			}
+			return ""
+		},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	keep := false
+	store := project.Store{StateDir: stateDir, HomeDir: home}
+	manifestPath, err := store.Save("sample", project.Manifest{
+		Version: 1, Path: projectDir, KeepInvokingTab: &keep,
+		Tabs: []project.Tab{{Title: "Terminal"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := application.projectTrust().Trust(manifestPath); err != nil {
+		t.Fatal(err)
+	}
+	runner.runs = nil
+
+	if err := application.Run(context.Background(), []string{"dev", "sample"}); err != nil {
+		t.Fatal(err)
+	}
+	want := runCall{
+		dir: projectDir, name: "/bin/kitten",
+		args: []string{"@", "close-window", "--self", "--no-response"},
+	}
+	if len(runner.runs) != 4 || !reflect.DeepEqual(runner.runs[3], want) {
+		t.Fatalf("calls = %#v, want final call %#v", runner.runs, want)
 	}
 }

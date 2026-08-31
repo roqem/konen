@@ -82,3 +82,15 @@ func TestPortablePath(t *testing.T) {
 		t.Fatalf("PortablePath() = %q", got)
 	}
 }
+
+func TestKeepInvokingTabDefaultsToTrue(t *testing.T) {
+	manifest := Manifest{}
+	if !manifest.KeepsInvokingTab() {
+		t.Fatal("missing keep_invoking_tab should preserve the caller")
+	}
+	keep := false
+	manifest.KeepInvokingTab = &keep
+	if manifest.KeepsInvokingTab() {
+		t.Fatal("explicit false should close the caller")
+	}
+}

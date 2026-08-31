@@ -21,10 +21,11 @@ type ProjectTabAnswer struct {
 }
 
 type ProjectAnswer struct {
-	Name  string
-	Path  string
-	Shell string
-	Tabs  []ProjectTabAnswer
+	Name            string
+	Path            string
+	Shell           string
+	KeepInvokingTab bool
+	Tabs            []ProjectTabAnswer
 }
 
 type Prompter interface {
@@ -122,8 +123,11 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 		huh.NewInput().Title("Pasta do projeto").Value(&answer.Path),
 		huh.NewInput().
 			Title("Shell (opcional)").
-			Description("Vazio usa $SHELL; os comandos são executados com -lc.").
+			Description("Vazio usa $SHELL; os comandos carregam o ambiente interativo.").
 			Value(&answer.Shell),
+		huh.NewConfirm().
+			Title("Manter a aba que executou `konen dev`?").
+			Affirmative("Manter").Negative("Fechar").Value(&answer.KeepInvokingTab),
 	)).WithInput(p.in).WithOutput(p.out)
 	if err := identity.Run(); err != nil {
 		return ProjectAnswer{}, err

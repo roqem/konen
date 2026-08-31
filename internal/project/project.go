@@ -16,10 +16,11 @@ import (
 const manifestVersion = 1
 
 type Manifest struct {
-	Version int    `toml:"version"`
-	Path    string `toml:"path"`
-	Shell   string `toml:"shell,omitempty"`
-	Tabs    []Tab  `toml:"tabs"`
+	Version         int    `toml:"version"`
+	Path            string `toml:"path"`
+	Shell           string `toml:"shell,omitempty"`
+	KeepInvokingTab *bool  `toml:"keep_invoking_tab,omitempty"`
+	Tabs            []Tab  `toml:"tabs"`
 }
 
 type Tab struct {
@@ -37,6 +38,10 @@ type Named struct {
 type Store struct {
 	StateDir string
 	HomeDir  string
+}
+
+func (m Manifest) KeepsInvokingTab() bool {
+	return m.KeepInvokingTab == nil || *m.KeepInvokingTab
 }
 
 func (s Store) List() ([]Named, error) {
