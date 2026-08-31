@@ -61,7 +61,7 @@ _konen_projects() {
 }
 
 _konen() {
-  local -a commands tool_actions package_actions repo_actions dotfile_actions project_actions
+  local -a commands tool_actions package_actions repo_actions command_actions dotfile_actions project_actions
   commands=(
     'init:configura ou cria o estado'
     'status:mostra tudo que o estado declara'
@@ -71,6 +71,7 @@ _konen() {
     'tool:gerencia ferramentas do estado'
     'package:gerencia pacotes do sistema no estado'
     'repo:gerencia repositórios Git no estado'
+    'command:gerencia comandos pessoais no estado'
     'dotfile:gerencia arquivos de configuração'
     'projects:lista os projetos cadastrados'
     'project:gerencia projetos e suas sessões'
@@ -89,6 +90,9 @@ _konen() {
   )
   repo_actions=(
     'add:adiciona um repositório Git ao estado'
+  )
+  command_actions=(
+    'add:cria ou importa um comando pessoal'
   )
   dotfile_actions=(
     'add:adiciona um dotfile ao estado'
@@ -197,6 +201,26 @@ _konen() {
         *) _describe 'ação' repo_actions ;;
       esac
       ;;
+    command)
+      if (( CURRENT == 2 )); then
+        _describe 'ação' command_actions
+        return
+      fi
+      local action=$words[2]
+      words=($words[2,-1])
+      (( CURRENT-- ))
+      case $action in
+        add)
+          _arguments \
+            '(-h --help)'{-h,--help}'[mostra ajuda]' \
+            '--yes[grava sem pedir confirmação]' \
+            '--dry-run[mostra os arquivos sem gravar]' \
+            '--from=[importa um arquivo existente]:arquivo:_files' \
+            '1:nome do comando'
+          ;;
+        *) _describe 'ação' command_actions ;;
+      esac
+      ;;
     dotfile)
       if (( CURRENT == 2 )); then
         _describe 'ação' dotfile_actions
@@ -256,7 +280,7 @@ const bashCompletion = `_konen_completion() {
   command="${COMP_WORDS[1]}"
 
   if [[ $COMP_CWORD -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W "init status plan diff apply tool package repo dotfile projects project dev trust doctor completion version help $(konen __complete projects 2>/dev/null)" -- "$current") )
+    COMPREPLY=( $(compgen -W "init status plan diff apply tool package repo command dotfile projects project dev trust doctor completion version help $(konen __complete projects 2>/dev/null)" -- "$current") )
     return
   fi
 
@@ -300,6 +324,16 @@ const bashCompletion = `_konen_completion() {
         COMPREPLY=( $(compgen -W '--yes --dry-run -h --help' -- "$current") )
       elif [[ $action == add && $COMP_CWORD -eq 3 ]]; then
         COMPREPLY=( $(compgen -d -- "$current") )
+      fi
+      ;;
+    command)
+      action="${COMP_WORDS[2]}"
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W 'add' -- "$current") )
+      elif [[ $action == add && $previous == --from ]]; then
+        COMPREPLY=( $(compgen -f -- "$current") )
+      elif [[ $action == add && $current == -* ]]; then
+        COMPREPLY=( $(compgen -W '--from --yes --dry-run -h --help' -- "$current") )
       fi
       ;;
     dotfile)
@@ -348,6 +382,7 @@ complete -c konen -n '__fish_use_subcommand' -a apply -d 'Aplica o estado com mi
 complete -c konen -n '__fish_use_subcommand' -a tool -d 'Gerencia ferramentas do estado'
 complete -c konen -n '__fish_use_subcommand' -a package -d 'Gerencia pacotes do sistema no estado'
 complete -c konen -n '__fish_use_subcommand' -a repo -d 'Gerencia repositórios Git no estado'
+complete -c konen -n '__fish_use_subcommand' -a command -d 'Gerencia comandos pessoais no estado'
 complete -c konen -n '__fish_use_subcommand' -a dotfile -d 'Gerencia arquivos de configuração'
 complete -c konen -n '__fish_use_subcommand' -a projects -d 'Lista os projetos cadastrados'
 complete -c konen -n '__fish_use_subcommand' -a project -d 'Gerencia projetos e suas sessões'
@@ -374,6 +409,10 @@ complete -c konen -n '__fish_seen_subcommand_from package' -l dry-run -d 'Mostra
 complete -c konen -n '__fish_seen_subcommand_from repo' -a add -d 'Adiciona um repositório Git ao estado'
 complete -c konen -n '__fish_seen_subcommand_from repo' -l yes -d 'Grava sem pedir confirmação'
 complete -c konen -n '__fish_seen_subcommand_from repo' -l dry-run -d 'Mostra a alteração sem gravar'
+complete -c konen -n '__fish_seen_subcommand_from command' -a add -d 'Cria ou importa um comando pessoal'
+complete -c konen -n '__fish_seen_subcommand_from command' -l from -r -F -d 'Importa um arquivo existente'
+complete -c konen -n '__fish_seen_subcommand_from command' -l yes -d 'Grava sem pedir confirmação'
+complete -c konen -n '__fish_seen_subcommand_from command' -l dry-run -d 'Mostra os arquivos sem gravar'
 complete -c konen -n '__fish_seen_subcommand_from dotfile' -a add -d 'Adiciona um dotfile ao estado'
 complete -c konen -n '__fish_seen_subcommand_from dotfile' -l mode -r -a 'symlink copy template' -d 'Modo do dotfile'
 complete -c konen -n '__fish_seen_subcommand_from dev' -l dry-run -d 'Mostra a sessão sem abrir abas'

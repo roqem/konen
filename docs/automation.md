@@ -26,6 +26,19 @@ Prefer a small command over a shell alias when it contains logic: commands work
 across shells, can be tested directly and can be used in project tab commands.
 Simple interactive abbreviations may still remain shell aliases.
 
+Create a safe scaffold or import an existing command through the guided flow:
+
+```console
+konen command add work-note
+konen command add --from ~/bin/work-note
+```
+
+Both forms display the complete proposed executable and ask before writing.
+`--dry-run` stops after that preview; `--yes` confirms only the file creation.
+Imported commands must be regular UTF-8 text files with a shebang and are
+copied rather than linked. Konen writes mode `0755`, refreshes local approval
+and does not execute the command.
+
 ## Custom installers
 
 An installer is an executable mise file task grouped under `install`:

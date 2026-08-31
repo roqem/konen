@@ -44,6 +44,10 @@ repository. Kitty remains the execution and layout engine.
   mise tables without installing packages or cloning checkouts. It preserves
   the rest of `mise.toml`, previews the exact diff, refuses to replace an
   existing declaration and refreshes trust only after an atomic write.
+- Guided personal-command registration creates a safe scaffold or copies a
+  reviewed UTF-8 executable into `scripts/bin`. It previews the entire file,
+  never executes it, refuses symbolic links and refreshes the content-bound
+  approval after creating the regular executable atomically.
 - Managed mise operations pin the selected state's `mise.toml` as the global
   config and configuration root, stop discovery at the state directory and
   accept only `mise.toml` there. This prevents a previously linked machine

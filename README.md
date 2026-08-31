@@ -35,7 +35,7 @@ selecionadas automaticamente:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.9 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.10 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -336,7 +336,33 @@ Um comando pessoal é um arquivo executável e versionado. Ele é melhor
 que um alias quando contém lógica, precisa receber argumentos ou será usado por
 uma aba de projeto.
 
-Crie `~/home/scripts/bin/work-note`:
+O assistente pode criar um esqueleto inofensivo:
+
+```console
+konen command add --dry-run work-note
+konen command add work-note
+```
+
+O arquivo criado apenas avisa que ainda precisa ser implementado e termina com
+erro; o Konen nunca o executa durante o cadastro. Depois da confirmação, edite
+o caminho exibido pelo assistente.
+
+Também é possível importar um comando que já existe. O nome é opcional e, se
+omitido, vem do arquivo de origem:
+
+```console
+konen command add --dry-run --from ~/bin/work-note
+konen command add --from ~/bin/work-note
+konen command add --from ~/bin/work-note work-note
+```
+
+A importação mostra o conteúdo completo, copia os bytes para `scripts/bin` e
+torna a cópia executável. Para que a prévia permaneça segura e o resultado seja
+portátil, a origem deve ser um arquivo de texto UTF-8 com shebang; links
+simbólicos e arquivos especiais são recusados.
+
+O resultado ainda é apenas um arquivo comum. Por exemplo,
+`~/home/scripts/bin/work-note` pode conter:
 
 ```sh
 #!/bin/sh
@@ -344,13 +370,15 @@ set -eu
 printf '%s\n' "${1:-Lembrete sem texto}"
 ```
 
-Depois:
+Depois de implementar o esqueleto, aprove novamente o conteúdo que mudou:
 
 ```console
-chmod +x ~/home/scripts/bin/work-note
 konen trust
 konen status
 ```
+
+Se preferir criar o arquivo inteiramente à mão, marque-o como executável com
+`chmod +x` antes do `konen trust`.
 
 Abra um terminal no qual mise esteja ativo e execute:
 
@@ -367,7 +395,9 @@ _.path = "{{ config_source | canonicalize | dirname }}/scripts/bin"
 ```
 
 Scripts em `scripts/bin` são arquivos normais do Git. Fazer commit deles é o
-backup; cloná-los em outra máquina os restaura.
+backup; cloná-los em outra máquina os restaura. Um alias curto e puramente
+interativo ainda pode ficar no arquivo do shell; quando houver lógica ou
+reutilização por projetos, prefira um comando pessoal.
 
 ### Instaladores pessoais
 
@@ -512,6 +542,8 @@ aprovação local separada; uma edição ou pull exige
 | `konen tool add [NOME] [VERSÃO]` | Adiciona uma ferramenta ao estado mostrando o diff. |
 | `konen package add [--manager M] PACOTE [VERSÃO]` | Adiciona um pacote do sistema sem instalá-lo. |
 | `konen repo add DESTINO URL [REF]` | Adiciona um checkout Git sem cloná-lo. |
+| `konen command add [NOME]` | Cria um comando pessoal sem executá-lo. |
+| `konen command add --from ARQUIVO [NOME]` | Importa um comando existente. |
 | `konen dotfile add CAMINHO` | Passa a gerenciar uma configuração existente. |
 | `konen project add [DIR]` | Cadastra um projeto e suas abas. |
 | `konen projects` | Lista projetos e a situação da aprovação. |

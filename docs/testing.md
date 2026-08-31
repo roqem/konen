@@ -27,7 +27,7 @@ uses the developer's home directory.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.9` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.10` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -44,7 +44,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.9 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.10 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -70,6 +70,9 @@ konen tool add --yes node lts
 konen package add --dry-run --manager apt jq latest
 konen package add --yes --manager apt jq latest
 konen repo add --dry-run ~/src/konen-docs-test https://github.com/roqem/konen.git main
+konen command add --dry-run work-note
+konen command add --yes work-note
+konen status
 konen plan
 konen plan --only packages
 konen plan --only tools,dotfiles
@@ -90,6 +93,9 @@ Expected results:
   declaration, and the confirmed command edits state without installing `jq`;
 - the repository dry run previews its destination, URL and ref without cloning
   anything;
+- the command dry run displays the complete safe scaffold, while the confirmed
+  command creates an executable `scripts/bin/work-note`, does not run it and
+  makes it visible as `Comando pessoal` in status;
 - dry runs use only the selected state, without merging a previously linked
   global config or ancestor version files;
 - `--only tools,dotfiles` limits the plan to those bootstrap phases;
