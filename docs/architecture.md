@@ -75,11 +75,13 @@ or a browser on the new machine. The intended journey is deliberately split:
 1. the public installer places Konen and mise in the user's home without sudo;
 2. Konen installs or locates the minimal public prerequisites, including Git
    and GitHub CLI when the selected remote needs them;
-3. GitHub CLI performs a device-code login and serves credentials directly to
-   one HTTPS clone without changing global Git configuration;
-4. Konen stores the helper command only in the clone's local `.git/config`,
-   requires explicit review and trust, and only then delegates the declared
-   machine plan to mise.
+3. if existing Git authentication does not satisfy the clone, GitHub CLI
+   performs a device-code login and serves credentials directly to one HTTPS
+   retry without changing global Git configuration;
+4. after that assisted retry, Konen stores the helper command only in the
+   clone's local `.git/config`, requires explicit review and trust, and only
+   then delegates the declared machine plan to mise. A clone that succeeded
+   before the fallback keeps its existing authentication unchanged.
 
 An existing GitHub login is not accepted merely because it is valid: Konen
 checks that the active account can read the requested repository. If another

@@ -116,9 +116,11 @@ bootstrap helper is not added to the user's machine state. If GitHub CLI has
 multiple accounts, Konen verifies repository access and explicitly asks it to
 switch accounts when the active one cannot read the selected state.
 
-The authenticated clone receives the GitHub CLI credential helper only for that
-command and records it only in the cloned repository's local `.git/config`.
-Konen does not run `gh auth setup-git` or alter either global Git config file.
+When an anonymous clone fails and the assisted path is needed, its retry
+receives the GitHub CLI credential helper only for that command and records it
+only in the cloned repository's local `.git/config`. A clone already satisfied
+by existing Git authentication is left as-is. Konen does not run
+`gh auth setup-git` or alter either global Git config file.
 For portable preferences, manage `~/.config/git/config`; `konen dotfile add`
 refuses whole `~/.gitconfig` captures and known plaintext credential files.
 

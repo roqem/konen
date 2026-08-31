@@ -109,9 +109,11 @@ trust, `status` must distinguish requested, resolved and installed tool state,
 and `plan` must show the full bootstrap dry run rather than `nothing configured`.
 Compare `git config --global --show-origin --get-all
 credential.https://github.com.helper` before and after the clone: it must not
-change. The same key queried with `git -C "$HOME/remote-state-test" config
---local --get-all` must show an empty reset entry followed by the machine-local
-GitHub CLI helper.
+change. If the initial clone failed and the assisted fallback ran, the same key
+queried with `git -C "$HOME/remote-state-test" config --local --get-all` must
+show an empty reset entry followed by the machine-local GitHub CLI helper. If
+pre-existing authentication made the initial clone succeed, no local entry is
+added and the existing mechanism remains untouched.
 
 Finally, exercise a project without requiring a graphical terminal:
 
