@@ -7,9 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/roqem/konen/internal/execx"
+	"github.com/roqem/konen/internal/project"
 	"github.com/roqem/konen/internal/ui"
 )
 
@@ -37,7 +39,8 @@ func (f *fakeRunner) Run(_ context.Context, dir, name string, args ...string) er
 	return nil
 }
 
-func (f *fakeRunner) Output(_ context.Context, _, name string, _ ...string) (string, error) {
+func (f *fakeRunner) Output(_ context.Context, dir, name string, args ...string) (string, error) {
+	f.runs = append(f.runs, runCall{dir: dir, name: name, args: append([]string(nil), args...)})
 	if output, ok := f.outputs[name]; ok {
 		return output, nil
 	}
@@ -51,6 +54,12 @@ func (unusedPrompter) Init(string) (ui.InitAnswer, error) {
 	return ui.InitAnswer{}, errors.New("unexpected prompt")
 }
 func (unusedPrompter) AddTarget() (string, error) { return "", errors.New("unexpected prompt") }
+func (unusedPrompter) Project(ui.ProjectAnswer) (ui.ProjectAnswer, error) {
+	return ui.ProjectAnswer{}, errors.New("unexpected prompt")
+}
+func (unusedPrompter) ChooseProject([]string) (string, error) {
+	return "", errors.New("unexpected prompt")
+}
 
 var _ execx.Runner = (*fakeRunner)(nil)
 
@@ -257,5 +266,129 @@ func TestFindCommandPrefersSiblingBinary(t *testing.T) {
 	}
 	if got != misePath {
 		t.Fatalf("findCommand() = %q, want %q", got, misePath)
+	}
+}
+
+func TestDevOpensTabsInCurrentKittyAndFocusesFirst(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	projectDir := filepath.Join(home, "Documents", "Projects", "sample")
+	stateDir := filepath.Join(root, "state")
+	configPath := filepath.Join(root, "config", "config.toml")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{
+		paths:   map[string]string{"mise": "/bin/mise", "kitten": "/bin/kitten"},
+		outputs: map[string]string{"/bin/kitten": "41\n"},
+	}
+	application := New(Options{
+		ConfigPath: configPath,
+		HomeDir:    home,
+		WorkDir:    projectDir,
+		Out:        &bytes.Buffer{},
+		Err:        &bytes.Buffer{},
+		Runner:     runner,
+		Prompter:   unusedPrompter{},
+		Getenv: func(name string) string {
+			switch name {
+			case "KITTY_WINDOW_ID":
+				return "4"
+			case "SHELL":
+				return "/bin/zsh"
+			default:
+				return ""
+			}
+		},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	store := project.Store{StateDir: stateDir, HomeDir: home}
+	manifestPath, err := store.Save("sample", project.Manifest{
+		Version: 1,
+		Path:    "~/Documents/Projects/sample",
+		Tabs: []project.Tab{
+			{Title: "Editor", Command: "nvim ."},
+			{Title: "Status", Command: "git status", Hold: true},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := application.projectTrust().Trust(manifestPath); err != nil {
+		t.Fatal(err)
+	}
+	runner.runs = nil
+
+	if err := application.Run(context.Background(), []string{"dev"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(runner.runs) != 4 {
+		t.Fatalf("runs = %#v", runner.runs)
+	}
+	wantFirst := runCall{
+		dir: projectDir, name: "/bin/kitten",
+		args: []string{"@", "launch", "--self", "--type=tab", "--keep-focus", "--tab-title", "Editor", "--cwd", projectDir, "--add-to-session", "konen-sample", "/bin/zsh", "-lc", "nvim ."},
+	}
+	if !reflect.DeepEqual(runner.runs[1], wantFirst) {
+		t.Fatalf("first launch = %#v, want %#v", runner.runs[1], wantFirst)
+	}
+	wantFocus := runCall{dir: projectDir, name: "/bin/kitten", args: []string{"@", "focus-tab", "--match", "window_id:41"}}
+	if !reflect.DeepEqual(runner.runs[3], wantFocus) {
+		t.Fatalf("focus = %#v, want %#v", runner.runs[3], wantFocus)
+	}
+}
+
+func TestDevRefusesChangedProjectUntilTrustedAgain(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	projectDir := filepath.Join(home, "project")
+	stateDir := filepath.Join(root, "state")
+	configPath := filepath.Join(root, "config", "config.toml")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise", "kitten": "/bin/kitten"}}
+	application := New(Options{
+		ConfigPath: configPath, HomeDir: home, WorkDir: projectDir,
+		Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, Runner: runner, Prompter: unusedPrompter{},
+		Getenv: func(string) string { return "4" },
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	store := project.Store{StateDir: stateDir, HomeDir: home}
+	manifestPath, err := store.Save("sample", project.Manifest{
+		Version: 1, Path: projectDir, Tabs: []project.Tab{{Title: "Terminal"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := application.projectTrust().Trust(manifestPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manifestPath, []byte("version = 1\npath = '"+projectDir+"'\n[[tabs]]\ntitle = 'Changed'\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runner.runs = nil
+	if err := application.Run(context.Background(), []string{"dev", "sample"}); err == nil || !strings.Contains(err.Error(), "não foram aprovados") {
+		t.Fatalf("dev error = %v", err)
+	}
+	if len(runner.runs) != 0 {
+		t.Fatalf("commands ran before trust: %#v", runner.runs)
+	}
+}
+
+func TestRenderKittySessionQuotesCommands(t *testing.T) {
+	got := renderKittySession("/tmp/project with space", "/bin/zsh", project.Manifest{
+		Tabs: []project.Tab{{Title: "It's ready", Command: "printf '%s' ok", Hold: true}},
+	})
+	want := "new_tab 'It'\\''s ready'\n" +
+		"cd '/tmp/project with space'\n" +
+		"launch --hold '/bin/zsh' -lc 'printf '\\''%s'\\'' ok'\n\n" +
+		"focus_tab 0\n"
+	if got != want {
+		t.Fatalf("session =\n%s\nwant =\n%s", got, want)
 	}
 }

@@ -12,7 +12,9 @@ does the package, tool, repository and dotfile convergence.
 The current state contract requires mise 2026.8.15 or newer.
 
 Konen is intentionally not another package manager and does not invent a
-private configuration format for your machine.
+private convergence format for your machine. Its small project manifests only
+describe how a workspace is opened; mise remains the source of truth for the
+machine itself.
 
 ## Status
 
@@ -56,6 +58,22 @@ konen apply
 konen doctor
 ```
 
+Projects and their terminal tabs live in the same central state, rather than
+being scattered as Kitty files across source repositories:
+
+```console
+cd ~/Documents/Projects/my-app
+konen project add
+konen dev --dry-run
+konen dev
+```
+
+`konen dev` infers the project from the current directory. A name is useful
+from anywhere (`konen dev my-app`). Inside Kitty it opens tabs in the current OS
+window; outside Kitty it starts a native Kitty session in a new window. Project
+commands must be approved locally and any out-of-band manifest change revokes
+that approval. See [docs/projects.md](docs/projects.md).
+
 An existing state repository can be cloned directly:
 
 ```console
@@ -76,7 +94,8 @@ my-machine/
 ├── .git/          # optional
 ├── .gitignore
 ├── mise.toml      # packages, tools, repos, services and dotfiles
-└── home/          # source files managed by mise
+├── home/          # source files managed by mise
+└── projects/      # Konen workspace manifests
 ```
 
 Konen stores only a pointer to that directory in

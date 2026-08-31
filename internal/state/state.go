@@ -59,6 +59,12 @@ func (s Service) PrepareLocal(ctx context.Context, path string, initializeGit bo
 	if err := writeIfMissing(filepath.Join(path, "home", ".gitkeep"), nil, 0o644); err != nil {
 		return err
 	}
+	if err := os.MkdirAll(filepath.Join(path, "projects"), 0o755); err != nil {
+		return err
+	}
+	if err := writeIfMissing(filepath.Join(path, "projects", ".gitkeep"), nil, 0o644); err != nil {
+		return err
+	}
 	if err := writeIfMissing(filepath.Join(path, ".gitignore"), []byte(defaultGitignore), 0o644); err != nil {
 		return err
 	}

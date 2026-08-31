@@ -50,6 +50,9 @@ func TestPrepareLocalCreatesPortableState(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(path, "home", ".gitkeep")); err != nil {
 		t.Fatalf("home directory was not initialized: %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(path, "projects", ".gitkeep")); err != nil {
+		t.Fatalf("projects directory was not initialized: %v", err)
+	}
 	if len(runner.runs) != 1 || runner.runs[0][1] != "git" {
 		t.Fatalf("git init calls = %#v", runner.runs)
 	}

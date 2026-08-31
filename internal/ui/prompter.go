@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"fmt"
 	"io"
+	"strings"
 
 	"charm.land/huh/v2"
 )
@@ -12,10 +14,25 @@ type InitAnswer struct {
 	InitializeGit bool
 }
 
+type ProjectTabAnswer struct {
+	Title   string
+	Command string
+	Hold    bool
+}
+
+type ProjectAnswer struct {
+	Name  string
+	Path  string
+	Shell string
+	Tabs  []ProjectTabAnswer
+}
+
 type Prompter interface {
 	Menu(configured bool) (string, error)
 	Init(defaultPath string) (InitAnswer, error)
 	AddTarget() (string, error)
+	Project(ProjectAnswer) (ProjectAnswer, error)
+	ChooseProject([]string) (string, error)
 }
 
 type HuhPrompter struct {
@@ -31,6 +48,7 @@ func (p HuhPrompter) Menu(configured bool) (string, error) {
 	var action string
 	options := []huh.Option[string]{
 		huh.NewOption("Preparar esta máquina", "apply"),
+		huh.NewOption("Abrir um projeto", "dev"),
 		huh.NewOption("Ver o estado", "status"),
 		huh.NewOption("Adicionar um arquivo", "add"),
 		huh.NewOption("Confiar no estado após revisar", "trust"),
@@ -96,4 +114,103 @@ func (p HuhPrompter) AddTarget() (string, error) {
 		huh.NewInput().Title("Arquivo ou diretório para adicionar").Value(&target),
 	)).WithInput(p.in).WithOutput(p.out)
 	return target, form.Run()
+}
+
+func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
+	identity := huh.NewForm(huh.NewGroup(
+		huh.NewInput().Title("Nome curto do projeto").Value(&answer.Name),
+		huh.NewInput().Title("Pasta do projeto").Value(&answer.Path),
+		huh.NewInput().
+			Title("Shell (opcional)").
+			Description("Vazio usa $SHELL; os comandos são executados com -lc.").
+			Value(&answer.Shell),
+	)).WithInput(p.in).WithOutput(p.out)
+	if err := identity.Run(); err != nil {
+		return ProjectAnswer{}, err
+	}
+
+	tabs := make([]ProjectTabAnswer, 0, len(answer.Tabs)+1)
+	for index, existing := range answer.Tabs {
+		keep := true
+		form := huh.NewForm(huh.NewGroup(
+			huh.NewInput().Title(fmt.Sprintf("Aba %d — título", index+1)).Value(&existing.Title),
+			huh.NewInput().
+				Title("Comando").
+				Description("Vazio abre apenas o shell do projeto.").
+				Value(&existing.Command),
+			huh.NewConfirm().
+				Title("Manter aberta quando o comando terminar?").
+				Affirmative("Sim").Negative("Não").Value(&existing.Hold),
+			huh.NewConfirm().
+				Title("Manter esta aba?").
+				Affirmative("Sim").Negative("Remover").Value(&keep),
+		)).WithInput(p.in).WithOutput(p.out)
+		if err := form.Run(); err != nil {
+			return ProjectAnswer{}, err
+		}
+		if keep {
+			existing.Title = strings.TrimSpace(existing.Title)
+			existing.Command = strings.TrimSpace(existing.Command)
+			tabs = append(tabs, existing)
+		}
+	}
+
+	addAnother := len(tabs) == 0
+	if len(tabs) > 0 {
+		form := huh.NewForm(huh.NewGroup(
+			huh.NewConfirm().
+				Title("Adicionar outra aba?").
+				Affirmative("Sim").Negative("Não").Value(&addAnother),
+		)).WithInput(p.in).WithOutput(p.out)
+		if err := form.Run(); err != nil {
+			return ProjectAnswer{}, err
+		}
+	}
+	for addAnother {
+		tab := ProjectTabAnswer{}
+		if len(tabs) == 0 {
+			tab = ProjectTabAnswer{Title: "Editor", Command: "nvim ."}
+		}
+		addAnother = false
+		form := huh.NewForm(huh.NewGroup(
+			huh.NewInput().Title("Título da aba").Value(&tab.Title),
+			huh.NewInput().
+				Title("Comando").
+				Description("Vazio abre apenas o shell do projeto.").
+				Value(&tab.Command),
+			huh.NewConfirm().
+				Title("Manter aberta quando o comando terminar?").
+				Affirmative("Sim").Negative("Não").Value(&tab.Hold),
+			huh.NewConfirm().
+				Title("Adicionar mais uma aba?").
+				Affirmative("Sim").Negative("Não").Value(&addAnother),
+		)).WithInput(p.in).WithOutput(p.out)
+		if err := form.Run(); err != nil {
+			return ProjectAnswer{}, err
+		}
+		tab.Title = strings.TrimSpace(tab.Title)
+		tab.Command = strings.TrimSpace(tab.Command)
+		tabs = append(tabs, tab)
+	}
+
+	answer.Name = strings.TrimSpace(answer.Name)
+	answer.Path = strings.TrimSpace(answer.Path)
+	answer.Shell = strings.TrimSpace(answer.Shell)
+	answer.Tabs = tabs
+	return answer, nil
+}
+
+func (p HuhPrompter) ChooseProject(names []string) (string, error) {
+	if len(names) == 0 {
+		return "", fmt.Errorf("nenhum projeto cadastrado; execute `konen project add`")
+	}
+	options := make([]huh.Option[string], 0, len(names))
+	for _, name := range names {
+		options = append(options, huh.NewOption(name, name))
+	}
+	var selected string
+	form := huh.NewForm(huh.NewGroup(
+		huh.NewSelect[string]().Title("Qual projeto deseja abrir?").Options(options...).Value(&selected),
+	)).WithInput(p.in).WithOutput(p.out)
+	return selected, form.Run()
 }

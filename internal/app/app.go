@@ -30,6 +30,8 @@ type Options struct {
 	Interactive bool
 	Version     string
 	BinDir      string
+	WorkDir     string
+	Getenv      func(string) string
 }
 
 type App struct {
@@ -40,6 +42,12 @@ type App struct {
 const minimumMiseVersion = "2026.8.15"
 
 func New(options Options) *App {
+	if options.Getenv == nil {
+		options.Getenv = os.Getenv
+	}
+	if options.WorkDir == "" {
+		options.WorkDir, _ = os.Getwd()
+	}
 	return &App{options: options, state: state.Service{Runner: options.Runner}}
 }
 
@@ -73,6 +81,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return a.runTrust(ctx, args[1:])
 	case "doctor":
 		return a.runDoctor(ctx)
+	case "dev":
+		return a.runDev(ctx, args[1:])
+	case "project":
+		return a.runProject(ctx, args[1:])
 	case "version", "--version", "-v":
 		fmt.Fprintln(a.options.Out, a.options.Version)
 		return nil
@@ -368,6 +380,13 @@ Uso:
   konen diff               mostra diferenças dos dotfiles
   konen apply [--dry-run]  aplica o estado com mise
   konen add [--mode MODE] CAMINHO...
+  konen project add [DIR] cadastra um projeto e suas abas
+  konen project edit NOME edita um projeto pelo assistente
+  konen project list      lista os projetos cadastrados
+  konen project show NOME mostra o manifest do projeto
+  konen project trust NOME aprova os comandos após revisão
+  konen dev [NOME]        abre o projeto em abas do Kitty
+  konen dev [NOME] --dry-run
   konen trust              confia no mise.toml após revisão
   konen doctor             diagnostica a instalação
   konen version

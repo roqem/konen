@@ -3,14 +3,21 @@
 ## Product boundary
 
 Konen owns the first-run experience, the location of the user's machine state,
-diagnostics and a small interactive menu. Mise owns convergence: operating-system
-packages, development tools, repositories, services, tasks and dotfiles.
+diagnostics, project workspace sessions and a small interactive menu. Mise owns
+convergence: operating-system packages, development tools, repositories,
+services, tasks and dotfiles.
 
 The initial implementation does not depend on chezmoi. Current mise releases
 already provide dotfile add, status, dry-run previews, apply, templates, copy/symlink modes
 and environment profiles. Adding a second dotfile engine now would duplicate
 responsibility. The boundary remains explicit enough to reconsider this if a
 real unsupported use case appears.
+
+Project sessions are the narrow exception to the no-private-format rule. A
+Konen project manifest expresses product behavior — project path, shell, tab
+titles and commands — that mise does not model. It lives under `projects/` in
+the central state repository, never as an arbitrary Kitty file in the source
+repository. Kitty remains the execution and layout engine.
 
 ## Trust and mutation
 
@@ -22,6 +29,25 @@ real unsupported use case appears.
   review; remote state is never trusted silently.
 - Secrets are not imported automatically and common plaintext secret files are
   ignored in newly created state repositories.
+- Project commands are approved by exact manifest digest in the local Konen
+  config directory. Manifests created or edited through the guided flow are
+  approved as part of that explicit action. A clone, pull or manual edit changes
+  the digest and requires `konen project trust NAME` before execution.
+
+## Project and tool configuration
+
+Konen centralizes workspace orchestration, not every setting a development tool
+may support:
+
+- Kitty tabs belong in a Konen project manifest because they describe how the
+  user opens a workspace.
+- User-wide Kitty, Neovim and shell settings belong in `home/` and are managed
+  by mise like other dotfiles.
+- Configuration that is genuinely part of a project's reproducible build or
+  contributor experience remains in that project.
+- Konen must not inject hidden project-local files merely to accommodate an
+  editor or terminal. A future adapter may generate a tool's native format only
+  when that format is required, previewable and has an unambiguous owner.
 
 ## Extensions
 
