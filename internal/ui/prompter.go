@@ -29,10 +29,17 @@ type ProjectAnswer struct {
 	Tabs            []ProjectTabAnswer
 }
 
+type ToolAnswer struct {
+	Name    string
+	Version string
+}
+
 type Prompter interface {
 	Menu(configured bool) (string, error)
 	Init(defaultPath string) (InitAnswer, error)
 	AddTarget() (string, error)
+	Tool(ToolAnswer) (ToolAnswer, error)
+	Confirm(string) (bool, error)
 	Project(ProjectAnswer) (ProjectAnswer, error)
 	ChooseProject([]string) (string, error)
 }
@@ -71,6 +78,7 @@ func (p HuhPrompter) Menu(configured bool) (string, error) {
 		huh.NewOption(CommandLabel("apply", "preparar esta máquina", 13), "apply"),
 		huh.NewOption(CommandLabel("dev", "abrir um projeto", 13), "dev"),
 		huh.NewOption(CommandLabel("status", "ver tudo configurado", 13), "status"),
+		huh.NewOption(CommandLabel("tool add", "adicionar uma ferramenta", 13), "__tool_add"),
 		huh.NewOption(CommandLabel("dotfile add", "adicionar um arquivo de configuração", 13), "__dotfile_add"),
 		huh.NewOption(CommandLabel("trust", "confiar no estado após revisar", 13), "trust"),
 		huh.NewOption(CommandLabel("doctor", "diagnosticar problemas", 13), "doctor"),
@@ -140,6 +148,37 @@ func (p HuhPrompter) AddTarget() (string, error) {
 		huh.NewInput().Title("Dotfile para adicionar").Value(&target),
 	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
 	return target, form.Run()
+}
+
+func (p HuhPrompter) Tool(answer ToolAnswer) (ToolAnswer, error) {
+	form := huh.NewForm(huh.NewGroup(
+		huh.NewInput().
+			Title("Ferramenta").
+			Description("Nome reconhecido pelo mise, como node, ruby ou neovim.").
+			Value(&answer.Name),
+		huh.NewInput().
+			Title("Versão").
+			Description("Use latest, lts ou uma versão como 3.4.").
+			Value(&answer.Version),
+	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
+	if err := form.Run(); err != nil {
+		return ToolAnswer{}, err
+	}
+	answer.Name = strings.TrimSpace(answer.Name)
+	answer.Version = strings.TrimSpace(answer.Version)
+	return answer, nil
+}
+
+func (p HuhPrompter) Confirm(title string) (bool, error) {
+	confirmed := false
+	form := huh.NewForm(huh.NewGroup(
+		huh.NewConfirm().
+			Title(title).
+			Affirmative("Gravar").
+			Negative("Cancelar").
+			Value(&confirmed),
+	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
+	return confirmed, form.Run()
 }
 
 func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {

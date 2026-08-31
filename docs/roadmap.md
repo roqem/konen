@@ -33,7 +33,8 @@ A primeira fundação pública já cobre:
 Objetivo: permitir que alguém monte seu primeiro estado sem precisar conhecer
 TOML, mantendo o `mise.toml` resultante simples e totalmente editável.
 
-- adicionar pelo menu ferramentas, pacotes do sistema e repositórios;
+- [x] adicionar ferramentas pelo menu, com diff e confirmação;
+- [ ] adicionar pacotes do sistema e repositórios pelo menu;
 - explicar versão, plataforma e gerenciador antes de gravar;
 - reutilizar o fluxo existente para capturar dotfiles;
 - criar ou importar um comando pessoal em `scripts/bin`;
@@ -67,7 +68,6 @@ Objetivo: tornar manutenção e atualização tão claras quanto o primeiro uso.
 Critério de conclusão: o usuário entende o resultado de cada aplicação, atualiza
 o produto conscientemente e mantém rotinas de projeto no estado central sem
 depender de aliases obscuros.
-
 
 ## Marco 3 — beta pública
 

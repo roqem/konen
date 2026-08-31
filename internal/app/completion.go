@@ -61,13 +61,14 @@ _konen_projects() {
 }
 
 _konen() {
-  local -a commands dotfile_actions project_actions
+  local -a commands tool_actions dotfile_actions project_actions
   commands=(
     'init:configura ou cria o estado'
     'status:mostra tudo que o estado declara'
     'plan:mostra exatamente o que mudaria'
     'diff:mostra diferenças dos dotfiles'
     'apply:aplica o estado com mise'
+    'tool:gerencia ferramentas do estado'
     'dotfile:gerencia arquivos de configuração'
     'projects:lista os projetos cadastrados'
     'project:gerencia projetos e suas sessões'
@@ -77,6 +78,9 @@ _konen() {
     'completion:gera autocomplete para o shell'
     'version:mostra a versão'
     'help:mostra ajuda'
+  )
+  tool_actions=(
+    'add:adiciona uma ferramenta ao estado'
   )
   dotfile_actions=(
     'add:adiciona um dotfile ao estado'
@@ -114,6 +118,26 @@ _konen() {
         '(-h --help)'{-h,--help}'[mostra ajuda]' \
         '--yes[não pede confirmação]' \
         '--dry-run[mostra o plano sem alterar a máquina]'
+      ;;
+    tool)
+      if (( CURRENT == 2 )); then
+        _describe 'ação' tool_actions
+        return
+      fi
+      local action=$words[2]
+      words=($words[2,-1])
+      (( CURRENT-- ))
+      case $action in
+        add)
+          _arguments \
+            '(-h --help)'{-h,--help}'[mostra ajuda]' \
+            '--yes[grava sem pedir confirmação]' \
+            '--dry-run[mostra a alteração sem gravar]' \
+            '1:ferramenta' \
+            '2:versão'
+          ;;
+        *) _describe 'ação' tool_actions ;;
+      esac
       ;;
     dotfile)
       if (( CURRENT == 2 )); then
@@ -174,7 +198,7 @@ const bashCompletion = `_konen_completion() {
   command="${COMP_WORDS[1]}"
 
   if [[ $COMP_CWORD -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W "init status plan diff apply dotfile projects project dev trust doctor completion version help $(konen __complete projects 2>/dev/null)" -- "$current") )
+    COMPREPLY=( $(compgen -W "init status plan diff apply tool dotfile projects project dev trust doctor completion version help $(konen __complete projects 2>/dev/null)" -- "$current") )
     return
   fi
 
@@ -188,6 +212,14 @@ const bashCompletion = `_konen_completion() {
       ;;
     apply)
       COMPREPLY=( $(compgen -W '--yes --dry-run -h --help' -- "$current") )
+      ;;
+    tool)
+      action="${COMP_WORDS[2]}"
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W 'add' -- "$current") )
+      elif [[ $action == add && $current == -* ]]; then
+        COMPREPLY=( $(compgen -W '--yes --dry-run -h --help' -- "$current") )
+      fi
       ;;
     dotfile)
       action="${COMP_WORDS[2]}"
@@ -232,6 +264,7 @@ complete -c konen -n '__fish_use_subcommand' -a status -d 'Mostra tudo que o est
 complete -c konen -n '__fish_use_subcommand' -a plan -d 'Mostra exatamente o que mudaria'
 complete -c konen -n '__fish_use_subcommand' -a diff -d 'Mostra diferenças dos dotfiles'
 complete -c konen -n '__fish_use_subcommand' -a apply -d 'Aplica o estado com mise'
+complete -c konen -n '__fish_use_subcommand' -a tool -d 'Gerencia ferramentas do estado'
 complete -c konen -n '__fish_use_subcommand' -a dotfile -d 'Gerencia arquivos de configuração'
 complete -c konen -n '__fish_use_subcommand' -a projects -d 'Lista os projetos cadastrados'
 complete -c konen -n '__fish_use_subcommand' -a project -d 'Gerencia projetos e suas sessões'
@@ -246,6 +279,9 @@ complete -c konen -n '__fish_seen_subcommand_from init' -l git -d 'Inicializa um
 complete -c konen -n '__fish_seen_subcommand_from init' -l from -r -d 'Clona um estado; GitHub privado tem login assistido'
 complete -c konen -n '__fish_seen_subcommand_from apply' -l yes -d 'Não pede confirmação'
 complete -c konen -n '__fish_seen_subcommand_from apply' -l dry-run -d 'Mostra o plano sem alterar a máquina'
+complete -c konen -n '__fish_seen_subcommand_from tool' -a add -d 'Adiciona uma ferramenta ao estado'
+complete -c konen -n '__fish_seen_subcommand_from tool' -l yes -d 'Grava sem pedir confirmação'
+complete -c konen -n '__fish_seen_subcommand_from tool' -l dry-run -d 'Mostra a alteração sem gravar'
 complete -c konen -n '__fish_seen_subcommand_from dotfile' -a add -d 'Adiciona um dotfile ao estado'
 complete -c konen -n '__fish_seen_subcommand_from dotfile' -l mode -r -a 'symlink copy template' -d 'Modo do dotfile'
 complete -c konen -n '__fish_seen_subcommand_from dev' -l dry-run -d 'Mostra a sessão sem abrir abas'

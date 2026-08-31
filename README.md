@@ -35,7 +35,7 @@ selecionadas automaticamente:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.6 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.7 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -187,7 +187,29 @@ konen apply
 
 ### Ferramentas com versão
 
-Use `[tools]` para programas de desenvolvimento que mise sabe gerenciar:
+O assistente pergunta o nome e a versão, mostra o diff do `mise.toml` e pede
+confirmação antes de gravar:
+
+```console
+konen tool add
+```
+
+Os mesmos campos podem ser informados diretamente. A prévia não grava nem
+instala nada:
+
+```console
+konen tool add --dry-run node lts
+konen tool add node lts
+```
+
+Depois da gravação, execute `konen plan` e `konen apply` para instalar. Em
+scripts não interativos, `--yes` confirma somente a edição do estado:
+
+```console
+konen tool add --yes node lts
+```
+
+O resultado continua sendo a seção nativa `[tools]` do mise:
 
 ```toml
 [tools]
@@ -428,6 +450,7 @@ aprovação local separada; uma edição ou pull exige
 | `konen apply` | Aplica o estado pedindo confirmações. |
 | `konen apply --yes` | Aplica sem perguntas; use somente depois de revisar o plano. |
 | `konen trust` | Aprova localmente o estado executável que você revisou. |
+| `konen tool add [NOME] [VERSÃO]` | Adiciona uma ferramenta ao estado mostrando o diff. |
 | `konen dotfile add CAMINHO` | Passa a gerenciar uma configuração existente. |
 | `konen project add [DIR]` | Cadastra um projeto e suas abas. |
 | `konen projects` | Lista projetos e a situação da aprovação. |

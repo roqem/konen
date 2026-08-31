@@ -85,6 +85,8 @@ func (a *App) run(ctx context.Context, args []string) error {
 		return a.runMise(ctx, []string{"bootstrap", "dotfiles", "diff"})
 	case "apply":
 		return a.runApply(ctx, args[1:])
+	case "tool":
+		return a.runTool(ctx, args[1:])
 	case "dotfile":
 		return a.runDotfile(ctx, args[1:])
 	case "add":
@@ -106,6 +108,8 @@ func (a *App) run(ctx context.Context, args []string) error {
 		return a.runCompletion(args[1:])
 	case "__dotfile_add":
 		return a.runDotfile(ctx, []string{"add"})
+	case "__tool_add":
+		return a.runTool(ctx, []string{"add"})
 	case "__exit":
 		return nil
 	case "__complete":
@@ -549,6 +553,13 @@ func (a *App) printHelp() {
 		{"konen trust", "confia no mise.toml após revisão"},
 		{"konen doctor", "diagnostica a instalação"},
 	})
+	a.printCommandGroup("Estado", [][2]string{
+		{"konen tool add [NOME] [VERSÃO]", "adiciona uma ferramenta pelo assistente"},
+		{"konen tool add --dry-run NOME [VERSÃO]", "mostra a alteração sem gravar"},
+		{"konen dotfile add CAMINHO...", "adiciona dotfiles ao estado"},
+		{"konen dotfile add --mode MODO CAMINHO...", "usa symlink, copy ou template"},
+		{"konen diff", "mostra diferenças dos dotfiles"},
+	})
 	a.printCommandGroup("Projetos", [][2]string{
 		{"konen projects", "lista os projetos cadastrados"},
 		{"konen project add [DIR]", "cadastra um projeto e suas abas"},
@@ -556,11 +567,6 @@ func (a *App) printHelp() {
 		{"konen project show NOME", "mostra o manifesto de um projeto"},
 		{"konen project trust NOME", "aprova os comandos após revisão"},
 		{"konen dev [NOME] [--dry-run]", "abre ou inspeciona a sessão do projeto"},
-	})
-	a.printCommandGroup("Arquivos de configuração", [][2]string{
-		{"konen dotfile add CAMINHO...", "adiciona dotfiles ao estado"},
-		{"konen dotfile add --mode MODO CAMINHO...", "usa symlink, copy ou template"},
-		{"konen diff", "mostra diferenças dos dotfiles"},
 	})
 	a.printCommandGroup("Shell", [][2]string{
 		{"konen completion zsh|bash|fish", "gera o autocomplete"},

@@ -12,7 +12,7 @@ import (
 
 func TestCompletionScriptsCoverCommandsAndDynamicProjects(t *testing.T) {
 	common := []string{
-		"init", "status", "plan", "diff", "apply", "dotfile", "add", "projects", "project", "dev",
+		"init", "status", "plan", "diff", "apply", "tool", "dotfile", "add", "projects", "project", "dev",
 		"trust", "doctor", "completion", "version", "help",
 		"edit", "list", "show", "__complete projects",
 	}

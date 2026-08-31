@@ -81,6 +81,10 @@ func (unusedPrompter) Init(string) (ui.InitAnswer, error) {
 	return ui.InitAnswer{}, errors.New("unexpected prompt")
 }
 func (unusedPrompter) AddTarget() (string, error) { return "", errors.New("unexpected prompt") }
+func (unusedPrompter) Tool(ui.ToolAnswer) (ui.ToolAnswer, error) {
+	return ui.ToolAnswer{}, errors.New("unexpected prompt")
+}
+func (unusedPrompter) Confirm(string) (bool, error) { return false, errors.New("unexpected prompt") }
 func (unusedPrompter) Project(ui.ProjectAnswer) (ui.ProjectAnswer, error) {
 	return ui.ProjectAnswer{}, errors.New("unexpected prompt")
 }
@@ -99,12 +103,26 @@ type menuPrompter struct {
 	err    error
 }
 
+type toolPrompter struct {
+	unusedPrompter
+	answer    ui.ToolAnswer
+	confirmed bool
+}
+
 func (p menuPrompter) Menu(bool) (string, error) {
 	return p.action, p.err
 }
 
 func (p projectPrompter) Project(ui.ProjectAnswer) (ui.ProjectAnswer, error) {
 	return p.answer, nil
+}
+
+func (p toolPrompter) Tool(ui.ToolAnswer) (ui.ToolAnswer, error) {
+	return p.answer, nil
+}
+
+func (p toolPrompter) Confirm(string) (bool, error) {
+	return p.confirmed, nil
 }
 
 var _ execx.Runner = (*fakeRunner)(nil)
@@ -502,8 +520,9 @@ func TestHelpGroupsCommandsAndSeparatesAddOperations(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, fragment := range []string{
-		"Início rápido:", "Máquina:", "Projetos:", "Arquivos de configuração:", "Shell:",
-		"konen NOME", "konen project add [DIR]", "konen dotfile add CAMINHO...",
+		"Início rápido:", "Máquina:", "Estado:", "Projetos:", "Shell:",
+		"konen NOME", "konen tool add [NOME] [VERSÃO]",
+		"konen project add [DIR]", "konen dotfile add CAMINHO...",
 	} {
 		assertOutputContains(t, out.String(), fragment)
 	}

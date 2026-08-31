@@ -27,7 +27,7 @@ uses the developer's home directory.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.6` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.7` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -44,7 +44,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.6 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.7 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -64,6 +64,8 @@ to initialize Git. Then run:
 ```console
 konen doctor
 konen status
+konen tool add --dry-run node lts
+konen tool add --yes node lts
 konen plan
 konen apply --dry-run
 konen apply
@@ -74,6 +76,8 @@ git -C ~/.local/share/konen/state status --short
 Expected results:
 
 - `doctor` recognizes the co-installed mise and the state directory;
+- the guided tool dry run displays the exact `mise.toml` diff without writing
+  it, while the confirmed command adds `node = "lts"` and refreshes trust;
 - the first dry run explains the temporary mise warning about the global
   config that does not exist until apply, and describes changes without
   applying them;
