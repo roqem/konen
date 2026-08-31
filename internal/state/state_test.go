@@ -44,7 +44,7 @@ func TestPrepareLocalCreatesPortableState(t *testing.T) {
 	if !strings.Contains(string(data), `dotfiles.root = "home"`) {
 		t.Fatalf("mise.toml does not use a portable relative dotfiles root:\n%s", data)
 	}
-	if !strings.Contains(string(data), `min_version = "2026.8.14"`) {
+	if !strings.Contains(string(data), `min_version = "2026.8.15"`) {
 		t.Fatalf("mise.toml does not pin the minimum supported mise version:\n%s", data)
 	}
 	if _, err := os.Stat(filepath.Join(path, "home", ".gitkeep")); err != nil {

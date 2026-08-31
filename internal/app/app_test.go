@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/roqem/zeroot/internal/execx"
-	"github.com/roqem/zeroot/internal/ui"
+	"github.com/roqem/konen/internal/execx"
+	"github.com/roqem/konen/internal/ui"
 )
 
 type runCall struct {
@@ -151,7 +151,7 @@ func TestAddPinsTheStateConfig(t *testing.T) {
 	}
 }
 
-func TestDiffUsesNonMutatingMisePreview(t *testing.T) {
+func TestDiffUsesNativeMiseDiff(t *testing.T) {
 	root := t.TempDir()
 	stateDir := filepath.Join(root, "state")
 	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
@@ -173,7 +173,7 @@ func TestDiffUsesNonMutatingMisePreview(t *testing.T) {
 
 	want := []string{
 		"-C", stateDir,
-		"bootstrap", "dotfiles", "apply", "--dry-run",
+		"bootstrap", "dotfiles", "diff",
 	}
 	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1].args, want) {
 		t.Fatalf("mise args = %#v, want %#v", runner.runs, want)
@@ -186,7 +186,7 @@ func TestExistingStateNeedsExplicitTrust(t *testing.T) {
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(stateDir, "mise.toml"), []byte("min_version = \"2026.8.14\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(stateDir, "mise.toml"), []byte("min_version = \"2026.8.15\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
@@ -223,7 +223,7 @@ func TestVersionComparison(t *testing.T) {
 		got  string
 		want bool
 	}{
-		{"2026.8.14", true},
+		{"2026.8.15", true},
 		{"2026.9.0", true},
 		{"2027.1.0", true},
 		{"2026.8.13", false},
@@ -235,7 +235,7 @@ func TestVersionComparison(t *testing.T) {
 		}
 	}
 
-	if got, err := extractVersion("2026.8.14 linux-x64 (2026-08-26)"); err != nil || got != "2026.8.14" {
+	if got, err := extractVersion("2026.8.15 linux-x64 (2026-08-26)"); err != nil || got != "2026.8.15" {
 		t.Fatalf("extractVersion() = %q, %v", got, err)
 	}
 }

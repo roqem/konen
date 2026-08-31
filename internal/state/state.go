@@ -9,17 +9,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/roqem/zeroot/internal/execx"
+	"github.com/roqem/konen/internal/execx"
 )
 
-const defaultMiseConfig = `min_version = "2026.8.14"
+const defaultMiseConfig = `min_version = "2026.8.15"
 
 [settings]
 dotfiles.root = "home"
 dotfiles.default_mode = "symlink"
 
 # Declare tools, packages, repositories and managed files here.
-# ` + "`zeroot add ~/.zshrc`" + ` adds a dotfile without inventing a second format.
+# ` + "`konen add ~/.zshrc`" + ` adds a dotfile without inventing a second format.
 `
 
 const defaultGitignore = `.env
@@ -144,7 +144,7 @@ func ensureUsableDirectory(path string) error {
 	}
 	for _, entry := range entries {
 		if entry.Name() != ".git" {
-			return fmt.Errorf("%s não está vazio e ainda não é um estado Zeroot (mise.toml ausente)", path)
+			return fmt.Errorf("%s não está vazio e ainda não é um estado Konen (mise.toml ausente)", path)
 		}
 	}
 	return nil

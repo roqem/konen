@@ -1,6 +1,6 @@
-module github.com/roqem/zeroot
+module github.com/roqem/konen
 
-go 1.25.8
+go 1.27.0
 
 require (
 	charm.land/huh/v2 v2.0.3

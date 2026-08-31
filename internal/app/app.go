@@ -13,10 +13,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/roqem/zeroot/internal/config"
-	"github.com/roqem/zeroot/internal/execx"
-	"github.com/roqem/zeroot/internal/state"
-	"github.com/roqem/zeroot/internal/ui"
+	"github.com/roqem/konen/internal/config"
+	"github.com/roqem/konen/internal/execx"
+	"github.com/roqem/konen/internal/state"
+	"github.com/roqem/konen/internal/ui"
 )
 
 type Options struct {
@@ -37,7 +37,7 @@ type App struct {
 	state   state.Service
 }
 
-const minimumMiseVersion = "2026.8.14"
+const minimumMiseVersion = "2026.8.15"
 
 func New(options Options) *App {
 	return &App{options: options, state: state.Service{Runner: options.Runner}}
@@ -64,7 +64,7 @@ func (a *App) Run(ctx context.Context, args []string) error {
 	case "status":
 		return a.runMise(ctx, []string{"bootstrap", "status"})
 	case "diff":
-		return a.runMise(ctx, []string{"bootstrap", "dotfiles", "apply", "--dry-run"})
+		return a.runMise(ctx, []string{"bootstrap", "dotfiles", "diff"})
 	case "apply":
 		return a.runApply(ctx, args[1:])
 	case "add":
@@ -97,7 +97,7 @@ func (a *App) runInit(ctx context.Context, args []string) error {
 		return errors.New("init aceita no máximo um caminho")
 	}
 
-	defaultPath := filepath.Join(a.options.HomeDir, ".local", "share", "zeroot", "state")
+	defaultPath := filepath.Join(a.options.HomeDir, ".local", "share", "konen", "state")
 	answer := ui.InitAnswer{Path: defaultPath, Remote: *remote, InitializeGit: *initializeGit}
 	if flags.NArg() == 1 {
 		answer.Path = flags.Arg(0)
@@ -141,14 +141,14 @@ func (a *App) runInit(ctx context.Context, args []string) error {
 		trusted = true
 	}
 
-	fmt.Fprintf(a.options.Out, "Zeroot configurado. Estado: %s\n", resolved)
+	fmt.Fprintf(a.options.Out, "Konen configurado. Estado: %s\n", resolved)
 	switch {
 	case trusted:
-		fmt.Fprintln(a.options.Out, "Próximo passo: execute `zeroot apply`.")
+		fmt.Fprintln(a.options.Out, "Próximo passo: execute `konen apply`.")
 	case miseErr != nil:
-		fmt.Fprintln(a.options.Out, "Próximo passo: instale o mise, revise o mise.toml e execute `zeroot trust`.")
+		fmt.Fprintln(a.options.Out, "Próximo passo: instale o mise, revise o mise.toml e execute `konen trust`.")
 	default:
-		fmt.Fprintln(a.options.Out, "Revise o mise.toml e execute `zeroot trust` antes de aplicar o estado.")
+		fmt.Fprintln(a.options.Out, "Revise o mise.toml e execute `konen trust` antes de aplicar o estado.")
 	}
 	return nil
 }
@@ -346,7 +346,7 @@ func versionAtLeast(got, minimum string) bool {
 func (a *App) loadState() (string, error) {
 	cfg, err := config.Load(a.options.ConfigPath)
 	if errors.Is(err, fs.ErrNotExist) {
-		return "", errors.New("Zeroot ainda não foi configurado; execute `zeroot init`")
+		return "", errors.New("Konen ainda não foi configurado; execute `konen init`")
 	}
 	if err != nil {
 		return "", err
@@ -358,18 +358,18 @@ func (a *App) loadState() (string, error) {
 }
 
 func (a *App) printHelp() {
-	fmt.Fprint(a.options.Out, `Zeroot — do zero à sua máquina
+	fmt.Fprint(a.options.Out, `Konen — do zero à sua máquina
 
 Uso:
-  zeroot                    abre o menu interativo
-  zeroot init [--git] [DIR] configura ou cria o estado
-  zeroot init --from URL [DIR]
-  zeroot status             mostra o estado da máquina
-  zeroot diff               mostra diferenças dos dotfiles
-  zeroot apply [--dry-run]  aplica o estado com mise
-  zeroot add [--mode MODE] CAMINHO...
-  zeroot trust              confia no mise.toml após revisão
-  zeroot doctor             diagnostica a instalação
-  zeroot version
+  konen                    abre o menu interativo
+  konen init [--git] [DIR] configura ou cria o estado
+  konen init --from URL [DIR]
+  konen status             mostra o estado da máquina
+  konen diff               mostra diferenças dos dotfiles
+  konen apply [--dry-run]  aplica o estado com mise
+  konen add [--mode MODE] CAMINHO...
+  konen trust              confia no mise.toml após revisão
+  konen doctor             diagnostica a instalação
+  konen version
 `)
 }

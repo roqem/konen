@@ -38,14 +38,14 @@ func (p HuhPrompter) Menu(configured bool) (string, error) {
 	}
 	if !configured {
 		options = []huh.Option[string]{
-			huh.NewOption("Configurar o Zeroot", "init"),
+			huh.NewOption("Configurar o Konen", "init"),
 			huh.NewOption("Diagnosticar problemas", "doctor"),
 		}
 	}
 
 	form := huh.NewForm(huh.NewGroup(
 		huh.NewSelect[string]().
-			Title("Zeroot — do zero à sua máquina").
+			Title("Konen — do zero à sua máquina").
 			Options(options...).
 			Value(&action),
 	)).WithInput(p.in).WithOutput(p.out)

@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/roqem/zeroot/internal/app"
-	"github.com/roqem/zeroot/internal/config"
-	"github.com/roqem/zeroot/internal/execx"
-	"github.com/roqem/zeroot/internal/ui"
+	"github.com/roqem/konen/internal/app"
+	"github.com/roqem/konen/internal/config"
+	"github.com/roqem/konen/internal/execx"
+	"github.com/roqem/konen/internal/ui"
 )
 
 var version = "dev"

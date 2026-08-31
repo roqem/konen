@@ -14,8 +14,8 @@ description = "Run static analysis"
 run = "go vet ./..."
 
 [tasks.build]
-description = "Build the local Zeroot executable"
-run = "go build -trimpath -o bin/zeroot ./cmd/zeroot"
+description = "Build the local Konen executable"
+run = "go build -trimpath -o bin/konen ./cmd/konen"
 
 [tasks.check]
 description = "Run all local quality gates"

@@ -28,7 +28,7 @@ if [[ -d "$dist_dir" ]] && [[ -n "$(find "$dist_dir" -mindepth 1 -maxdepth 1 -pr
 fi
 
 mkdir -p "$dist_dir"
-build_root=$(mktemp -d "${TMPDIR:-/tmp}/zeroot-release.XXXXXX")
+build_root=$(mktemp -d "${TMPDIR:-/tmp}/konen-release.XXXXXX")
 trap 'rm -rf -- "$build_root"' EXIT INT TERM
 
 source_date_epoch="${SOURCE_DATE_EPOCH:-$(git -C "$repository_root" log -1 --format=%ct)}"
@@ -37,18 +37,21 @@ for architecture in amd64 arm64; do
   stage_dir="$build_root/$architecture"
   mkdir -p "$stage_dir"
 
-  CGO_ENABLED=0 GOOS=linux GOARCH="$architecture" \
-    go build \
-      -buildvcs=false \
-      -trimpath \
-      -ldflags="-s -w -buildid= -X main.version=$version" \
-      -o "$stage_dir/zeroot" \
-      "$repository_root/cmd/zeroot"
+  (
+    cd "$repository_root"
+    CGO_ENABLED=0 GOOS=linux GOARCH="$architecture" \
+      go build \
+        -buildvcs=false \
+        -trimpath \
+        -ldflags="-s -w -buildid= -X main.version=$version" \
+        -o "$stage_dir/konen" \
+        ./cmd/konen
+  )
 
   install -m 0644 "$repository_root/README.md" "$stage_dir/README.md"
   install -m 0644 "$repository_root/LICENSE" "$stage_dir/LICENSE"
 
-  archive="zeroot_${version}_linux_${architecture}.tar.gz"
+  archive="konen_${version}_linux_${architecture}.tar.gz"
   tar \
     --sort=name \
     --mtime="@$source_date_epoch" \
@@ -57,12 +60,12 @@ for architecture in amd64 arm64; do
     --numeric-owner \
     -C "$stage_dir" \
     -cf - \
-    LICENSE README.md zeroot | gzip -n -9 > "$dist_dir/$archive"
+    LICENSE README.md konen | gzip -n -9 > "$dist_dir/$archive"
 done
 
 (
   cd "$dist_dir"
-  sha256sum zeroot_*.tar.gz > checksums.txt
+  sha256sum konen_*.tar.gz > checksums.txt
 )
 
 echo "Artefatos gerados em $dist_dir"

@@ -2,18 +2,18 @@
 
 set -eu
 
-repository="${ZEROOT_REPOSITORY:-roqem/zeroot}"
-release_base="${ZEROOT_RELEASE_BASE_URL:-https://github.com/$repository/releases}"
-mise_release_base="${ZEROOT_MISE_RELEASE_BASE_URL:-https://github.com/jdx/mise/releases}"
-mise_version="${ZEROOT_MISE_VERSION:-2026.8.14}"
-install_mise="${ZEROOT_INSTALL_MISE:-1}"
+repository="${KONEN_REPOSITORY:-roqem/konen}"
+release_base="${KONEN_RELEASE_BASE_URL:-https://github.com/$repository/releases}"
+mise_release_base="${KONEN_MISE_RELEASE_BASE_URL:-https://github.com/jdx/mise/releases}"
+mise_version="${KONEN_MISE_VERSION:-2026.8.15}"
+install_mise="${KONEN_INSTALL_MISE:-1}"
 
 say() {
   printf '%s\n' "$*"
 }
 
 fail() {
-  printf 'zeroot-install: %s\n' "$*" >&2
+  printf 'konen-install: %s\n' "$*" >&2
   exit 1
 }
 
@@ -115,10 +115,10 @@ case "$(uname -m)" in
     ;;
 esac
 
-if [ -n "${ZEROOT_INSTALL_DIR:-}" ]; then
-  install_dir=$ZEROOT_INSTALL_DIR
+if [ -n "${KONEN_INSTALL_DIR:-}" ]; then
+  install_dir=$KONEN_INSTALL_DIR
 else
-  [ -n "${HOME:-}" ] || fail "HOME não está definido; use ZEROOT_INSTALL_DIR"
+  [ -n "${HOME:-}" ] || fail "HOME não está definido; use KONEN_INSTALL_DIR"
   install_dir="$HOME/.local/bin"
 fi
 
@@ -127,8 +127,8 @@ case "$install_dir" in
   *) install_dir="$PWD/$install_dir" ;;
 esac
 
-if [ -n "${ZEROOT_VERSION:-}" ]; then
-  version=${ZEROOT_VERSION#v}
+if [ -n "${KONEN_VERSION:-}" ]; then
+  version=${KONEN_VERSION#v}
 else
   latest_url=$(curl -fsSL -o /dev/null -w '%{url_effective}' "$release_base/latest")
   latest_tag=${latest_url##*/}
@@ -139,22 +139,22 @@ case "$version" in
   "" | *[!0-9A-Za-z._-]*) fail "versão inválida: $version" ;;
 esac
 
-temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/zeroot-install.XXXXXX")
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/konen-install.XXXXXX")
 trap 'rm -rf -- "$temporary_dir"' 0 1 2 15
 
-archive="zeroot_${version}_linux_${architecture}.tar.gz"
+archive="konen_${version}_linux_${architecture}.tar.gz"
 archive_path="$temporary_dir/$archive"
 checksums_path="$temporary_dir/checksums.txt"
 download_root="$release_base/download/v$version"
 
-say "Baixando Zeroot $version para linux/$architecture..."
+say "Baixando Konen $version para linux/$architecture..."
 download "$download_root/$archive" "$archive_path"
 download "$download_root/checksums.txt" "$checksums_path"
 verify_checksum "$archive_path" "$checksums_path" "$archive"
 
-mkdir -p "$temporary_dir/zeroot"
-tar -xzf "$archive_path" -C "$temporary_dir/zeroot"
-[ -f "$temporary_dir/zeroot/zeroot" ] || fail "o archive não contém o executável zeroot"
+mkdir -p "$temporary_dir/konen"
+tar -xzf "$archive_path" -C "$temporary_dir/konen"
+[ -f "$temporary_dir/konen/konen" ] || fail "o archive não contém o executável konen"
 
 mise_was_installed=0
 if [ "$install_mise" != "0" ]; then
@@ -181,21 +181,21 @@ if [ "$install_mise" != "0" ]; then
 fi
 
 install -d "$install_dir"
-install -m 0755 "$temporary_dir/zeroot/zeroot" "$install_dir/zeroot"
+install -m 0755 "$temporary_dir/konen/konen" "$install_dir/konen"
 if [ "$mise_was_installed" = "1" ]; then
   install -m 0755 "$mise_path_tmp" "$install_dir/mise"
 fi
 
-say "Zeroot $version instalado em $install_dir/zeroot"
+say "Konen $version instalado em $install_dir/konen"
 if [ "$mise_was_installed" = "1" ]; then
   say "mise $mise_version instalado em $install_dir/mise"
 fi
 
 case ":${PATH:-}:" in
   *":$install_dir:"*)
-    say "Execute: zeroot"
+    say "Execute: konen"
     ;;
   *)
-    say "Adicione $install_dir ao PATH ou execute: $install_dir/zeroot"
+    say "Adicione $install_dir ao PATH ou execute: $install_dir/konen"
     ;;
 esac

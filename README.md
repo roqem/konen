@@ -1,14 +1,17 @@
-# Zeroot
+# Konen
 
 > Do zero à sua máquina.
 
-Zeroot is a small, friendly front end for rebuilding a workstation from plain,
+Konen is a [Roqem](https://github.com/roqem) project. Its name comes from the
+Hebrew כּוֹנֵן (*konen*): to establish or build.
+
+Konen is a small, friendly front end for rebuilding a workstation from plain,
 versionable state. It provides the guided experience; [mise](https://mise.jdx.dev/)
 does the package, tool, repository and dotfile convergence.
 
-The current state contract requires mise 2026.8.14 or newer.
+The current state contract requires mise 2026.8.15 or newer.
 
-Zeroot is intentionally not another package manager and does not invent a
+Konen is intentionally not another package manager and does not invent a
 private configuration format for your machine.
 
 ## Status
@@ -21,17 +24,17 @@ implemented, but there is no published release yet.
 After the first public release, the complete interactive entry point will be:
 
 ```console
-curl -fsSL https://raw.githubusercontent.com/roqem/zeroot/main/install.sh | sh && ~/.local/bin/zeroot
+curl -fsSL https://raw.githubusercontent.com/roqem/konen/main/install.sh | sh && ~/.local/bin/konen
 ```
 
 The installer uses no sudo, verifies release checksums and installs a compatible
-mise beside Zeroot when necessary. To inspect the script before executing it:
+mise beside Konen when necessary. To inspect the script before executing it:
 
 ```console
-curl -fsSLO https://raw.githubusercontent.com/roqem/zeroot/main/install.sh
+curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
 sh install.sh
-~/.local/bin/zeroot
+~/.local/bin/konen
 ```
 
 See [docs/distribution.md](docs/distribution.md) for version pinning, mirrors,
@@ -39,30 +42,30 @@ artifact attestations and the trust model.
 
 ## Commands
 
-Running `zeroot` opens an interactive menu. The same operations remain available
+Running `konen` opens an interactive menu. The same operations remain available
 as small commands for scripts and recovery environments:
 
 ```console
-zeroot init ~/my-machine --git
-zeroot trust
-zeroot add ~/.zshrc
-zeroot status
-zeroot diff
-zeroot apply --dry-run
-zeroot apply
-zeroot doctor
+konen init --git ~/my-machine
+konen trust
+konen add ~/.zshrc
+konen status
+konen diff
+konen apply --dry-run
+konen apply
+konen doctor
 ```
 
 An existing state repository can be cloned directly:
 
 ```console
-zeroot init --from git@github.com:you/my-machine.git
-less ~/.local/share/zeroot/state/mise.toml
-zeroot trust
+konen init --from git@github.com:you/my-machine.git
+less ~/.local/share/konen/state/mise.toml
+konen trust
 ```
 
-Fresh state created by Zeroot is trusted automatically. Existing folders and
-cloned repositories require an explicit `zeroot trust` after inspection.
+Fresh state created by Konen is trusted automatically. Existing folders and
+cloned repositories require an explicit `konen trust` after inspection.
 
 ## State
 
@@ -76,8 +79,8 @@ my-machine/
 └── home/          # source files managed by mise
 ```
 
-Zeroot stores only a pointer to that directory in
-`~/.config/zeroot/config.toml`. It never commits or pushes on your behalf.
+Konen stores only a pointer to that directory in
+`~/.config/konen/config.toml`. It never commits or pushes on your behalf.
 
 ## Development
 
@@ -88,11 +91,11 @@ mise install
 mise run check
 ```
 
-Without mise, use Go 1.25.8 or newer:
+Without mise, use Go 1.27.0 or newer:
 
 ```console
 go test ./...
-go build ./cmd/zeroot
+go build ./cmd/konen
 ```
 
 See [docs/architecture.md](docs/architecture.md) for the scope and extension

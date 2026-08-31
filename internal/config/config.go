@@ -21,7 +21,7 @@ func DefaultPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "zeroot", "config.toml"), nil
+	return filepath.Join(dir, "konen", "config.toml"), nil
 }
 
 func Load(path string) (Config, error) {
