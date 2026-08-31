@@ -93,6 +93,8 @@ func (a *App) run(ctx context.Context, args []string) error {
 		return a.runRepo(ctx, args[1:])
 	case "command":
 		return a.runPersonalCommand(ctx, args[1:])
+	case "installer":
+		return a.runPersonalInstaller(ctx, args[1:])
 	case "dotfile":
 		return a.runDotfile(ctx, args[1:])
 	case "add":
@@ -122,6 +124,8 @@ func (a *App) run(ctx context.Context, args []string) error {
 		return a.runRepo(ctx, []string{"add"})
 	case "__command_add":
 		return a.runPersonalCommand(ctx, []string{"add"})
+	case "__installer_add":
+		return a.runPersonalInstaller(ctx, []string{"add"})
 	case "__plan_select":
 		return a.runApply(ctx, []string{"--dry-run", "--select"})
 	case "__apply_select":
@@ -595,6 +599,9 @@ func (a *App) printHelp() {
 		{"konen command add [NOME]", "cria um comando pessoal seguro"},
 		{"konen command add --from ARQUIVO [NOME]", "importa um comando existente"},
 		{"konen command add --dry-run [--from ARQUIVO] [NOME]", "mostra o executável sem gravar"},
+		{"konen installer add [NOME]", "cria e seleciona um instalador pessoal"},
+		{"konen installer add --from ARQUIVO [NOME]", "importa e seleciona um instalador"},
+		{"konen installer add --dry-run [--from ARQUIVO] [NOME]", "mostra o instalador e o bootstrap sem gravar"},
 		{"konen dotfile add CAMINHO...", "adiciona dotfiles ao estado"},
 		{"konen dotfile add --mode MODO CAMINHO...", "usa symlink, copy ou template"},
 		{"konen diff", "mostra diferenças dos dotfiles"},

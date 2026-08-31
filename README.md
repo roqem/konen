@@ -35,7 +35,7 @@ selecionadas automaticamente:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.10 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.11 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -405,7 +405,19 @@ Prefira `[tools]`, `[bootstrap.packages]`, `[bootstrap.repos]` e `[dotfiles]`.
 Crie um instalador somente quando o software exigir passos que essas seções não
 conseguem expressar, como adicionar um repositório oficial do fornecedor.
 
-Um arquivo `~/home/mise-tasks/install/example` pode começar assim:
+O assistente cria o arquivo e já o seleciona, em ordem, no bootstrap:
+
+```console
+konen installer add --dry-run example
+konen installer add example
+```
+
+A prévia mostra o arquivo executável completo e o diff do `mise.toml`. Nada é
+executado durante o cadastro. O esqueleto criado não contém comandos de
+instalação e termina com erro de propósito: implemente e revise o arquivo antes
+do próximo `apply`, em vez de deixar uma instalação vazia parecer bem-sucedida.
+
+Um `~/home/mise-tasks/install/example` implementado pode ficar assim:
 
 ```sh
 #!/bin/sh
@@ -419,14 +431,15 @@ fi
 # Coloque aqui os menores passos necessários, usando fontes oficiais.
 ```
 
-Marque-o como executável:
+Depois de editar o esqueleto, aprove o conteúdo executável que mudou:
 
 ```console
-chmod +x ~/home/mise-tasks/install/example
+git -C ~/home diff
+konen trust
+konen plan --only task
 ```
 
-Para executá-lo automaticamente durante `konen apply`, selecione a tarefa no
-`mise.toml`:
+O assistente já terá criado esta seleção no `mise.toml`:
 
 ```toml
 [tasks.bootstrap]
@@ -439,20 +452,25 @@ Use referências em `run` para manter instaladores sequenciais. Dependências
 comuns podem rodar em paralelo e dois instaladores que usam apt disputariam o
 mesmo lock.
 
-Finalize revisando o próprio script:
+Também é possível importar um instalador já existente. O nome é opcional e, se
+omitido, vem do arquivo de origem:
 
 ```console
-git -C ~/home diff
-konen trust
-konen plan
-konen apply
+konen installer add --dry-run --from ~/bin/install-example
+konen installer add --from ~/bin/install-example
+konen installer add --from ~/bin/install-example example
 ```
 
-`plan` mostra que a tarefa foi selecionada, mas não a executa. Tarefas pessoais
-são chamadas em toda aplicação; por isso cada uma deve detectar o que já está
-pronto e terminar rapidamente. Evite `curl ... | sh`: prefira repositórios
-assinados ou artefatos oficiais, valide o que foi baixado e deixe cada uso de
-`sudo` visível no arquivo.
+A importação copia exatamente o texto revisado, exige um arquivo regular UTF-8
+com shebang e grava a cópia como executável. Links simbólicos e arquivos
+especiais são recusados.
+
+`plan` mostra que a tarefa foi selecionada, mas não a executa. Quando o plano
+estiver correto, `konen apply` a chamará depois dos recursos declarativos e das
+ferramentas. Tarefas pessoais são chamadas em toda aplicação; por isso cada
+uma deve detectar o que já está pronto e terminar rapidamente. Evite
+`curl ... | sh`: prefira repositórios assinados ou artefatos oficiais, valide o
+que foi baixado e deixe cada uso de `sudo` visível no arquivo.
 
 O guia técnico, incluindo a fronteira exata de confiança, está em
 [docs/automation.md](docs/automation.md).
@@ -544,6 +562,8 @@ aprovação local separada; uma edição ou pull exige
 | `konen repo add DESTINO URL [REF]` | Adiciona um checkout Git sem cloná-lo. |
 | `konen command add [NOME]` | Cria um comando pessoal sem executá-lo. |
 | `konen command add --from ARQUIVO [NOME]` | Importa um comando existente. |
+| `konen installer add [NOME]` | Cria e seleciona um instalador pessoal sem executá-lo. |
+| `konen installer add --from ARQUIVO [NOME]` | Importa e seleciona um instalador existente. |
 | `konen dotfile add CAMINHO` | Passa a gerenciar uma configuração existente. |
 | `konen project add [DIR]` | Cadastra um projeto e suas abas. |
 | `konen projects` | Lista projetos e a situação da aprovação. |

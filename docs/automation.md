@@ -56,8 +56,25 @@ command -v example >/dev/null 2>&1 && exit 0
 # Perform the smallest idempotent installation that remains necessary.
 ```
 
-It is available explicitly as `mise run install:example`. To include it in the
-machine bootstrap, declare the dependency in `mise.toml`:
+Konen can create a deliberately incomplete scaffold or import an existing
+installer, then select its native mise task in the sequential bootstrap list:
+
+```console
+konen installer add example
+konen installer add --from ~/bin/install-example
+```
+
+Both forms display the complete executable and the `mise.toml` diff before
+writing. `--dry-run` stops after the preview; `--yes` confirms the two writes,
+not task execution. Imported files must be regular UTF-8 text files with a
+shebang and are copied with mode `0755`. The generated scaffold contains no
+installation command and exits unsuccessfully until implemented, preventing a
+future apply from reporting a no-op installer as successful. After editing it,
+run `konen trust` before planning or applying the state.
+
+It is available explicitly as `mise run install:example`. The guided flow
+creates this native selection in `mise.toml`; a manually created installer can
+declare the same dependency directly:
 
 ```toml
 [tasks.bootstrap]

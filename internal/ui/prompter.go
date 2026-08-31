@@ -52,6 +52,12 @@ type PersonalCommandAnswer struct {
 	Source string
 }
 
+type PersonalInstallerAnswer struct {
+	Mode   string
+	Name   string
+	Source string
+}
+
 type ApplyPart struct {
 	Key         string
 	Label       string
@@ -66,6 +72,7 @@ type Prompter interface {
 	Package(PackageAnswer) (PackageAnswer, error)
 	Repository(RepositoryAnswer) (RepositoryAnswer, error)
 	PersonalCommand(PersonalCommandAnswer) (PersonalCommandAnswer, error)
+	PersonalInstaller(PersonalInstallerAnswer) (PersonalInstallerAnswer, error)
 	ChooseApplyParts([]ApplyPart) ([]string, error)
 	Confirm(string) (bool, error)
 	Project(ProjectAnswer) (ProjectAnswer, error)
@@ -110,6 +117,7 @@ func (p HuhPrompter) Menu(configured bool) (string, error) {
 		huh.NewOption(CommandLabel("package add", "adicionar um pacote do sistema", 13), "__package_add"),
 		huh.NewOption(CommandLabel("repo add", "adicionar um repositório Git", 13), "__repo_add"),
 		huh.NewOption(CommandLabel("command add", "criar ou importar um comando pessoal", 13), "__command_add"),
+		huh.NewOption(CommandLabel("installer add", "criar ou importar um instalador pessoal", 13), "__installer_add"),
 		huh.NewOption(CommandLabel("dotfile add", "adicionar um arquivo de configuração", 13), "__dotfile_add"),
 		huh.NewOption(CommandLabel("trust", "confiar no estado após revisar", 13), "trust"),
 		huh.NewOption(CommandLabel("doctor", "diagnosticar problemas", 13), "doctor"),
@@ -299,6 +307,53 @@ func (p HuhPrompter) PersonalCommand(answer PersonalCommandAnswer) (PersonalComm
 		WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
 	if err := form.Run(); err != nil {
 		return PersonalCommandAnswer{}, err
+	}
+	answer.Mode = strings.TrimSpace(answer.Mode)
+	answer.Name = strings.TrimSpace(answer.Name)
+	answer.Source = strings.TrimSpace(answer.Source)
+	return answer, nil
+}
+
+func (p HuhPrompter) PersonalInstaller(answer PersonalInstallerAnswer) (PersonalInstallerAnswer, error) {
+	if answer.Mode == "" {
+		answer.Mode = "create"
+	}
+	mode := huh.NewForm(huh.NewGroup(
+		huh.NewSelect[string]().
+			Title("Como deseja adicionar o instalador?").
+			Description("Ele será revisado agora e chamado futuramente pelo bootstrap.").
+			Options(
+				huh.NewOption("Criar um esqueleto sem comandos de instalação", "create"),
+				huh.NewOption("Importar um arquivo existente", "import"),
+			).
+			Value(&answer.Mode),
+	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
+	if err := mode.Run(); err != nil {
+		return PersonalInstallerAnswer{}, err
+	}
+
+	nameDescription := "Exemplos: chrome, docker ou company-vpn."
+	if answer.Mode == "import" {
+		nameDescription = "Deixe vazio para usar o nome do arquivo de origem."
+	}
+	fields := []huh.Field{
+		huh.NewInput().
+			Title("Nome do instalador").
+			Description(nameDescription).
+			Value(&answer.Name),
+	}
+	if answer.Mode == "import" {
+		fields = append([]huh.Field{
+			huh.NewInput().
+				Title("Arquivo para importar").
+				Description("O conteúdo será copiado; links simbólicos não são aceitos.").
+				Value(&answer.Source),
+		}, fields...)
+	}
+	form := huh.NewForm(huh.NewGroup(fields...)).
+		WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
+	if err := form.Run(); err != nil {
+		return PersonalInstallerAnswer{}, err
 	}
 	answer.Mode = strings.TrimSpace(answer.Mode)
 	answer.Name = strings.TrimSpace(answer.Name)

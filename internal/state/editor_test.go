@@ -76,3 +76,78 @@ func TestTOMLStringEscapesSpecialCharacters(t *testing.T) {
 		t.Fatalf("TOMLString() = %q", got)
 	}
 }
+
+func TestAddTaskRunReferenceCreatesSequentialBootstrap(t *testing.T) {
+	before := []byte("min_version = \"2026.8.15\"\n")
+	after, exists, err := AddTaskRunReference(before, "install:chrome")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exists {
+		t.Fatal("new task reference reported as existing")
+	}
+	want := `[tasks.bootstrap]
+run = [
+  { task = "install:chrome" },
+]`
+	if !strings.Contains(string(after), want) {
+		t.Fatalf("bootstrap task was not created:\n%s", after)
+	}
+}
+
+func TestAddTaskRunReferenceAppendsWithoutReformattingOrLosingComments(t *testing.T) {
+	before := []byte(`[tasks.bootstrap]
+# installers stay sequential
+run = [
+  { task = "install:chrome" }, # browser
+	  { task = "install:docker" } # daemon
+]
+
+[tools]
+node = "lts"
+`)
+	after, exists, err := AddTaskRunReference(before, "install:kitty")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exists {
+		t.Fatal("new task reference reported as existing")
+	}
+	for _, fragment := range []string{
+		"# installers stay sequential", `# browser`,
+		`{ task = "install:docker" }, # daemon`, `{ task = "install:kitty" },`,
+		"[tools]\nnode = \"lts\"",
+	} {
+		if !strings.Contains(string(after), fragment) {
+			t.Fatalf("edited bootstrap is missing %q:\n%s", fragment, after)
+		}
+	}
+}
+
+func TestAddTaskRunReferenceSupportsSingleLineAndDetectsDuplicate(t *testing.T) {
+	before := []byte("[tasks.bootstrap]\nrun = [{ task = \"install:chrome\" }]\n")
+	after, exists, err := AddTaskRunReference(before, "install:kitty")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exists || !strings.Contains(string(after),
+		`run = [{ task = "install:chrome" }, { task = "install:kitty" }]`) {
+		t.Fatalf("single-line append = exists:%v\n%s", exists, after)
+	}
+
+	again, exists, err := AddTaskRunReference(after, "install:kitty")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exists || string(again) != string(after) {
+		t.Fatalf("duplicate changed the document: exists=%v\n%s", exists, again)
+	}
+}
+
+func TestAddTaskRunReferenceRefusesIncompatibleRunDeclaration(t *testing.T) {
+	before := []byte("[tasks.bootstrap]\nrun = \"mise run install:chrome\"\n")
+	if _, _, err := AddTaskRunReference(before, "install:kitty"); err == nil ||
+		!strings.Contains(err.Error(), "precisa ser uma lista") {
+		t.Fatalf("incompatible run error = %v", err)
+	}
+}

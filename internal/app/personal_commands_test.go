@@ -190,21 +190,21 @@ func TestPersonalCommandAddRejectsUnsafeNameAndSource(t *testing.T) {
 	if err := os.WriteFile(source, []byte("printf 'missing shebang\\n'\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := readPersonalCommand(source); err == nil || !strings.Contains(err.Error(), "shebang") {
+	if _, err := readReviewedExecutable(source, "comando"); err == nil || !strings.Contains(err.Error(), "shebang") {
 		t.Fatalf("source without shebang error = %v", err)
 	}
 	link := filepath.Join(root, "link")
 	if err := os.Symlink(source, link); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := readPersonalCommand(link); err == nil || !strings.Contains(err.Error(), "simbólico") {
+	if _, err := readReviewedExecutable(link, "comando"); err == nil || !strings.Contains(err.Error(), "simbólico") {
 		t.Fatalf("symlink source error = %v", err)
 	}
 	unsafe := filepath.Join(root, "unsafe")
 	if err := os.WriteFile(unsafe, []byte("#!/bin/sh\nprintf '\x1b[31m'\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := readPersonalCommand(unsafe); err == nil || !strings.Contains(err.Error(), "controle") {
+	if _, err := readReviewedExecutable(unsafe, "comando"); err == nil || !strings.Contains(err.Error(), "controle") {
 		t.Fatalf("terminal control source error = %v", err)
 	}
 }

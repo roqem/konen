@@ -19,7 +19,7 @@ import (
 
 const (
 	personalCommandPathExpression = "{{ config_source | canonicalize | dirname }}/scripts/bin"
-	maxPersonalCommandBytes       = 1024 * 1024
+	maxReviewedExecutableBytes    = 1024 * 1024
 )
 
 func (a *App) runPersonalCommand(ctx context.Context, args []string) error {
@@ -88,7 +88,7 @@ func (a *App) runPersonalCommandAdd(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		contents, err = readPersonalCommand(sourcePath)
+		contents, err = readReviewedExecutable(sourcePath, "comando")
 		if err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func (a *App) runPersonalCommandAdd(ctx context.Context, args []string) error {
 
 	commandRelative := filepath.ToSlash(filepath.Join("scripts", "bin", answer.Name))
 	commandPath := filepath.Join(stateDir, filepath.FromSlash(commandRelative))
-	if err := personalCommandDestinationAvailable(commandPath); err != nil {
+	if err := executableDestinationAvailable(commandPath, "comando pessoal"); err != nil {
 		return err
 	}
 	if err := validatePersonalCommandParents(stateDir); err != nil {
@@ -148,7 +148,7 @@ func (a *App) runPersonalCommandAdd(ctx context.Context, args []string) error {
 	if !bytes.Equal(beforeConfig, currentConfig) {
 		return errors.New("mise.toml mudou durante a revisão; execute o comando novamente")
 	}
-	if err := personalCommandDestinationAvailable(commandPath); err != nil {
+	if err := executableDestinationAvailable(commandPath, "comando pessoal"); err != nil {
 		return err
 	}
 	if err := createPersonalCommand(stateDir, commandPath, contents); err != nil {
@@ -181,13 +181,23 @@ func validatePersonalCommandAnswer(answer ui.PersonalCommandAnswer) error {
 	if answer.Mode != "create" && answer.Mode != "import" {
 		return errors.New("modo inválido; use create ou import")
 	}
-	if answer.Name == "" {
-		return errors.New("o nome do comando não pode ser vazio")
+	if err := validateExecutableName(answer.Name); err != nil {
+		return err
 	}
-	if len(answer.Name) > 128 {
-		return errors.New("o nome do comando não pode exceder 128 caracteres")
+	if answer.Mode == "import" && answer.Source == "" {
+		return errors.New("informe o arquivo que deve ser importado")
 	}
-	for index, character := range answer.Name {
+	return nil
+}
+
+func validateExecutableName(name string) error {
+	if name == "" {
+		return errors.New("o nome não pode ser vazio")
+	}
+	if len(name) > 128 {
+		return errors.New("o nome não pode exceder 128 caracteres")
+	}
+	for index, character := range name {
 		valid := character >= 'a' && character <= 'z' ||
 			character >= 'A' && character <= 'Z' ||
 			character >= '0' && character <= '9'
@@ -197,9 +207,6 @@ func validatePersonalCommandAnswer(answer ui.PersonalCommandAnswer) error {
 		if !valid {
 			return errors.New("o nome deve começar com letra ou número e usar apenas letras, números, ponto, hífen ou sublinhado")
 		}
-	}
-	if answer.Mode == "import" && answer.Source == "" {
-		return errors.New("informe o arquivo que deve ser importado")
 	}
 	return nil
 }
@@ -213,45 +220,45 @@ exit 1
 `, name))
 }
 
-func readPersonalCommand(path string) ([]byte, error) {
+func readReviewedExecutable(path, subject string) ([]byte, error) {
 	info, err := os.Lstat(path)
 	if err != nil {
-		return nil, fmt.Errorf("não foi possível ler o comando de origem: %w", err)
+		return nil, fmt.Errorf("não foi possível ler o %s de origem: %w", subject, err)
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
-		return nil, errors.New("o comando de origem não pode ser um link simbólico; informe o arquivo real")
+		return nil, fmt.Errorf("o %s de origem não pode ser um link simbólico; informe o arquivo real", subject)
 	}
 	if !info.Mode().IsRegular() {
-		return nil, errors.New("o comando de origem deve ser um arquivo regular")
+		return nil, fmt.Errorf("o %s de origem deve ser um arquivo regular", subject)
 	}
-	if info.Size() > maxPersonalCommandBytes {
-		return nil, fmt.Errorf("o comando de origem excede o limite de %d bytes", maxPersonalCommandBytes)
+	if info.Size() > maxReviewedExecutableBytes {
+		return nil, fmt.Errorf("o %s de origem excede o limite de %d bytes", subject, maxReviewedExecutableBytes)
 	}
 	contents, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 	if len(contents) == 0 {
-		return nil, errors.New("o comando de origem está vazio")
+		return nil, fmt.Errorf("o %s de origem está vazio", subject)
 	}
-	if len(contents) > maxPersonalCommandBytes {
-		return nil, fmt.Errorf("o comando de origem excede o limite de %d bytes", maxPersonalCommandBytes)
+	if len(contents) > maxReviewedExecutableBytes {
+		return nil, fmt.Errorf("o %s de origem excede o limite de %d bytes", subject, maxReviewedExecutableBytes)
 	}
 	if !utf8.Valid(contents) {
-		return nil, errors.New("o comando de origem precisa ser um arquivo de texto UTF-8")
+		return nil, fmt.Errorf("o %s de origem precisa ser um arquivo de texto UTF-8", subject)
 	}
 	for _, character := range string(contents) {
 		if character < 0x20 && character != '\n' && character != '\t' || character == 0x7f {
-			return nil, errors.New("o comando de origem contém caracteres de controle que não podem ser exibidos com segurança")
+			return nil, fmt.Errorf("o %s de origem contém caracteres de controle que não podem ser exibidos com segurança", subject)
 		}
 	}
 	if !bytes.HasPrefix(contents, []byte("#!")) {
-		return nil, errors.New("o comando de origem precisa começar com um shebang, como #!/bin/sh")
+		return nil, fmt.Errorf("o %s de origem precisa começar com um shebang, como #!/bin/sh", subject)
 	}
 	return contents, nil
 }
 
-func personalCommandDestinationAvailable(path string) error {
+func executableDestinationAvailable(path, subject string) error {
 	_, err := os.Lstat(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil
@@ -259,7 +266,7 @@ func personalCommandDestinationAvailable(path string) error {
 	if err != nil {
 		return err
 	}
-	return fmt.Errorf("o comando pessoal já existe: %s", path)
+	return fmt.Errorf("o %s já existe: %s", subject, path)
 }
 
 func validatePersonalCommandParents(stateDir string) error {
@@ -283,7 +290,11 @@ func createPersonalCommand(stateDir, path string, contents []byte) error {
 	if err := ensurePersonalCommandParents(stateDir); err != nil {
 		return err
 	}
-	temporary, err := os.CreateTemp(filepath.Dir(path), ".command-*.tmp")
+	return createExclusiveExecutable(path, contents, "comando pessoal")
+}
+
+func createExclusiveExecutable(path string, contents []byte, subject string) error {
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".executable-*.tmp")
 	if err != nil {
 		return err
 	}
@@ -301,7 +312,7 @@ func createPersonalCommand(stateDir, path string, contents []byte) error {
 		return err
 	}
 	if err := os.Link(temporaryPath, path); err != nil {
-		return fmt.Errorf("não foi possível criar o comando pessoal: %w", err)
+		return fmt.Errorf("não foi possível criar o %s: %w", subject, err)
 	}
 	return nil
 }

@@ -161,7 +161,7 @@ case " $* " in
   *" bootstrap status --json "*)
     printf '%s\n' '{"tools":[{"tool":"go","requested_version":"1.27.0","resolved_version":"1.27.0","state":"installed","installed":true}]}'
     ;;
-  *" bootstrap --dry-run "*)
+  *" bootstrap --dry-run "*|*" bootstrap --only task --dry-run "*)
     printf 'fixture apply: dry run\n'
     ;;
   " trust "*)
@@ -212,10 +212,43 @@ esac
 	output = runCommand(t, root, environment, konen, "apply", "--dry-run")
 	assertContains(t, output, "fixture apply: dry run")
 
+	installerMarker := filepath.Join(root, "installer-was-run")
+	installerSource := filepath.Join(root, "install-noop")
+	installerContents := "#!/bin/sh\n#MISE description=\"Integration installer\"\nset -eu\nprintf executed > \"" + installerMarker + "\"\n"
+	writeExecutable(t, installerSource, installerContents)
+	output = runCommand(t, root, environment, konen,
+		"installer", "add", "--dry-run", "--from", installerSource, "noop")
+	assertContains(t, output, "Instalador pessoal: noop")
+	assertContains(t, output, "Seleção proposta no bootstrap sequencial")
+	assertContains(t, output, "Nenhum arquivo foi gravado e nenhuma tarefa foi executada")
+	installerDestination := filepath.Join(stateDir, "mise-tasks", "install", "noop")
+	if _, err := os.Lstat(installerDestination); !os.IsNotExist(err) {
+		t.Fatalf("installer dry run created its destination: %v", err)
+	}
+	output = runCommand(t, root, environment, konen,
+		"installer", "add", "--yes", "--from", installerSource, "noop")
+	assertContains(t, output, "O instalador não foi executado durante o cadastro")
+	assertExecutable(t, installerDestination)
+	if got, err := os.ReadFile(installerDestination); err != nil || string(got) != installerContents {
+		t.Fatalf("imported installer = %q, error=%v", got, err)
+	}
+	if _, err := os.Stat(installerMarker); !os.IsNotExist(err) {
+		t.Fatalf("guided add ran the installer: %v", err)
+	}
+	output = runCommand(t, root, environment, konen, "status")
+	assertContains(t, output, "Instalador pessoal")
+	assertContains(t, output, "install:noop")
+	output = runCommand(t, root, environment, konen, "plan", "--only", "task")
+	assertContains(t, output, "fixture apply: dry run")
+	if _, err := os.Stat(installerMarker); !os.IsNotExist(err) {
+		t.Fatalf("installer plan ran the task: %v", err)
+	}
+
 	completion := runCommand(t, root, environment, konen, "completion", "zsh")
 	assertContains(t, completion, "#compdef konen")
 	assertContains(t, completion, "__complete projects")
 	assertContains(t, completion, "dotfile")
+	assertContains(t, completion, "installer")
 
 	manifestPath := filepath.Join(stateDir, "projects", "sample.toml")
 	manifest := `version = 1

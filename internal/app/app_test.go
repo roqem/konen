@@ -106,6 +106,9 @@ func (unusedPrompter) Repository(ui.RepositoryAnswer) (ui.RepositoryAnswer, erro
 func (unusedPrompter) PersonalCommand(ui.PersonalCommandAnswer) (ui.PersonalCommandAnswer, error) {
 	return ui.PersonalCommandAnswer{}, errors.New("unexpected prompt")
 }
+func (unusedPrompter) PersonalInstaller(ui.PersonalInstallerAnswer) (ui.PersonalInstallerAnswer, error) {
+	return ui.PersonalInstallerAnswer{}, errors.New("unexpected prompt")
+}
 func (unusedPrompter) ChooseApplyParts([]ui.ApplyPart) ([]string, error) {
 	return nil, errors.New("unexpected prompt")
 }
@@ -541,6 +544,7 @@ func TestHelpGroupsCommandsAndSeparatesAddOperations(t *testing.T) {
 		"Início rápido:", "Máquina:", "Estado:", "Projetos:", "Shell:",
 		"konen NOME", "konen tool add [NOME] [VERSÃO]",
 		"konen command add [NOME]",
+		"konen installer add [NOME]",
 		"konen project add [DIR]", "konen dotfile add CAMINHO...",
 	} {
 		assertOutputContains(t, out.String(), fragment)

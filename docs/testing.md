@@ -27,7 +27,7 @@ uses the developer's home directory.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.10` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.11` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -44,7 +44,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.10 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.11 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -103,6 +103,32 @@ Expected results:
 - the final status has no unexpected pending resources;
 - the state is an ordinary Git repository, Konen explains that it did not
   commit anything, and its initial files are visible as untracked.
+
+After the real apply, exercise installer authoring without adding an incomplete
+task to the applied journey:
+
+```console
+konen installer add --dry-run browser-test
+printf '%s\n' \
+  '#!/bin/sh' \
+  '#MISE description="Harmless installer test"' \
+  'set -eu' \
+  'exit 0' \
+  > "$HOME/install-noop"
+konen installer add --dry-run --from "$HOME/install-noop" noop
+konen installer add --yes --from "$HOME/install-noop" noop
+cmp "$HOME/install-noop" \
+  "$HOME/.local/share/konen/state/mise-tasks/install/noop"
+konen status
+konen plan --only task
+```
+
+The scaffold preview must show an executable that exits unsuccessfully and a
+sequential `install:browser-test` selection, while writing neither file. The
+import must copy exact bytes with mode `0755`, append only `install:noop` to the
+native bootstrap list, refresh trust and never execute it. Status must list it
+as `Instalador pessoal`; the task-only plan may print the command but must not
+run it.
 
 Check completion in the VM's shell. For Bash:
 

@@ -91,8 +91,10 @@ may support:
 - Personal commands live under `scripts/bin` and are added through mise's
   native `env._.path`; custom installers are native executable file tasks under
   `mise-tasks/install`. A native `bootstrap` task selects which installers are
-  part of convergence. Konen provides visibility and content-aware approval,
-  not another task or installer format.
+  part of convergence. The guided installer flow previews both files, appends a
+  sequential task reference and never invents or executes installation
+  commands. Its empty scaffold fails until implemented. Konen provides
+  visibility and content-aware approval, not another task or installer format.
 - Configuration that is genuinely part of a project's reproducible build or
   contributor experience remains in that project.
 - Konen must not inject hidden project-local files merely to accommodate an

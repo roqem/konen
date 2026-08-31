@@ -40,7 +40,7 @@ TOML, mantendo o `mise.toml` resultante simples e totalmente editável.
 - [x] explicar versão, plataforma e gerenciador antes de gravar;
 - [x] reutilizar o fluxo existente para capturar dotfiles;
 - [x] criar ou importar um comando pessoal em `scripts/bin`;
-- [ ] criar o esqueleto de um instalador e selecioná-lo no `bootstrap`, sem gerar
+- [x] criar o esqueleto de um instalador e selecioná-lo no `bootstrap`, sem gerar
   comandos de instalação não revisados;
 - [x] mostrar o diff do arquivo que será alterado;
 - [x] atualizar a confiança após uma mutação feita pelo assistente;
