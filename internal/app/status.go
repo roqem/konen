@@ -30,7 +30,10 @@ func (a *App) runStatus(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	output, err := a.options.Runner.Output(ctx, stateDir, misePath, "-C", stateDir, "bootstrap", "status", "--json")
+	output, err := a.options.Runner.OutputEnv(
+		ctx, stateDir, miseStateEnvironment(stateDir), misePath,
+		"-C", stateDir, "bootstrap", "status", "--json",
+	)
 	if err != nil {
 		return fmt.Errorf("mise: %w", err)
 	}
@@ -430,15 +433,16 @@ var statusFields = map[string]string{
 }
 
 var statusStates = map[string]string{
-	"applied":   "aplicado",
-	"installed": "instalado",
-	"missing":   "ausente",
-	"differs":   "diferente",
-	"pending":   "pendente",
-	"running":   "executando",
-	"stopped":   "parado",
-	"enabled":   "habilitado",
-	"disabled":  "desabilitado",
-	"current":   "atual",
-	"set":       "configurado",
+	"applied":        "aplicado",
+	"installed":      "instalado",
+	"missing":        "ausente",
+	"source_missing": "fonte ausente",
+	"differs":        "diferente",
+	"pending":        "pendente",
+	"running":        "executando",
+	"stopped":        "parado",
+	"enabled":        "habilitado",
+	"disabled":       "desabilitado",
+	"current":        "atual",
+	"set":            "configurado",
 }

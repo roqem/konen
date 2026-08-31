@@ -110,14 +110,22 @@ _konen() {
 		'--from=[clona um estado; github:OWNER/REPO ativa login assistido]:origem do repositório:_urls' \
         '1:pasta do estado:_directories'
       ;;
-    status|plan|diff|projects|trust|doctor|version|help)
+    status|diff|projects|trust|doctor|version|help)
       _arguments
+      ;;
+    plan)
+      _arguments \
+        '(-h --help)'{-h,--help}'[mostra ajuda]' \
+        '--select[escolhe as etapas interativamente]' \
+        '--only=[limita a etapas separadas por vírgula]:etapas:(packages repos dotfiles tools task)'
       ;;
     apply)
       _arguments \
         '(-h --help)'{-h,--help}'[mostra ajuda]' \
         '--yes[não pede confirmação]' \
-        '--dry-run[mostra o plano sem alterar a máquina]'
+        '--dry-run[mostra o plano sem alterar a máquina]' \
+        '--select[escolhe as etapas interativamente]' \
+        '--only=[limita a etapas separadas por vírgula]:etapas:(packages repos dotfiles tools task)'
       ;;
     tool)
       if (( CURRENT == 2 )); then
@@ -210,8 +218,11 @@ const bashCompletion = `_konen_completion() {
         COMPREPLY=( $(compgen -d -- "$current") )
       fi
       ;;
+    plan)
+      COMPREPLY=( $(compgen -W '--select --only -h --help' -- "$current") )
+      ;;
     apply)
-      COMPREPLY=( $(compgen -W '--yes --dry-run -h --help' -- "$current") )
+      COMPREPLY=( $(compgen -W '--yes --dry-run --select --only -h --help' -- "$current") )
       ;;
     tool)
       action="${COMP_WORDS[2]}"
@@ -279,6 +290,8 @@ complete -c konen -n '__fish_seen_subcommand_from init' -l git -d 'Inicializa um
 complete -c konen -n '__fish_seen_subcommand_from init' -l from -r -d 'Clona um estado; GitHub privado tem login assistido'
 complete -c konen -n '__fish_seen_subcommand_from apply' -l yes -d 'Não pede confirmação'
 complete -c konen -n '__fish_seen_subcommand_from apply' -l dry-run -d 'Mostra o plano sem alterar a máquina'
+complete -c konen -n '__fish_seen_subcommand_from plan apply' -l select -d 'Escolhe as etapas interativamente'
+complete -c konen -n '__fish_seen_subcommand_from plan apply' -l only -r -a 'packages repos dotfiles tools task' -d 'Limita a etapas'
 complete -c konen -n '__fish_seen_subcommand_from tool' -a add -d 'Adiciona uma ferramenta ao estado'
 complete -c konen -n '__fish_seen_subcommand_from tool' -l yes -d 'Grava sem pedir confirmação'
 complete -c konen -n '__fish_seen_subcommand_from tool' -l dry-run -d 'Mostra a alteração sem gravar'

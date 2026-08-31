@@ -12,6 +12,7 @@ type Runner interface {
 	Run(ctx context.Context, dir, name string, args ...string) error
 	RunEnv(ctx context.Context, dir string, environment []string, name string, args ...string) error
 	Output(ctx context.Context, dir, name string, args ...string) (string, error)
+	OutputEnv(ctx context.Context, dir string, environment []string, name string, args ...string) (string, error)
 }
 
 type OSRunner struct {
@@ -46,6 +47,21 @@ func (r OSRunner) RunEnv(ctx context.Context, dir string, environment []string, 
 func (r OSRunner) Output(ctx context.Context, dir, name string, args ...string) (string, error) {
 	command := exec.CommandContext(ctx, name, args...)
 	command.Dir = dir
+	command.Stderr = r.Err
+	output, err := command.Output()
+	return string(output), err
+}
+
+func (r OSRunner) OutputEnv(
+	ctx context.Context,
+	dir string,
+	environment []string,
+	name string,
+	args ...string,
+) (string, error) {
+	command := exec.CommandContext(ctx, name, args...)
+	command.Dir = dir
+	command.Env = append(os.Environ(), environment...)
 	command.Stderr = r.Err
 	output, err := command.Output()
 	return string(output), err

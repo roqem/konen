@@ -60,15 +60,28 @@ func (f *fakeRunner) RunEnv(_ context.Context, dir string, environment []string,
 }
 
 func (f *fakeRunner) Output(_ context.Context, dir, name string, args ...string) (string, error) {
-	call := runCall{dir: dir, name: name, args: append([]string(nil), args...)}
+	return f.output(runCall{dir: dir, name: name, args: append([]string(nil), args...)})
+}
+
+func (f *fakeRunner) OutputEnv(
+	_ context.Context,
+	dir string,
+	environment []string,
+	name string,
+	args ...string,
+) (string, error) {
+	return f.output(runCall{
+		dir: dir, environment: append([]string(nil), environment...),
+		name: name, args: append([]string(nil), args...),
+	})
+}
+
+func (f *fakeRunner) output(call runCall) (string, error) {
 	f.runs = append(f.runs, call)
 	if f.outputHook != nil {
 		return f.outputHook(call)
 	}
-	if len(args) >= 2 && args[len(args)-2] == "trust" && args[len(args)-1] == "--show" {
-		return dir + ": trusted\n", nil
-	}
-	if output, ok := f.outputs[name]; ok {
+	if output, ok := f.outputs[call.name]; ok {
 		return output, nil
 	}
 	return "", errors.New("no output")
@@ -83,6 +96,9 @@ func (unusedPrompter) Init(string) (ui.InitAnswer, error) {
 func (unusedPrompter) AddTarget() (string, error) { return "", errors.New("unexpected prompt") }
 func (unusedPrompter) Tool(ui.ToolAnswer) (ui.ToolAnswer, error) {
 	return ui.ToolAnswer{}, errors.New("unexpected prompt")
+}
+func (unusedPrompter) ChooseApplyParts([]ui.ApplyPart) ([]string, error) {
+	return nil, errors.New("unexpected prompt")
 }
 func (unusedPrompter) Confirm(string) (bool, error) { return false, errors.New("unexpected prompt") }
 func (unusedPrompter) Project(ui.ProjectAnswer) (ui.ProjectAnswer, error) {
@@ -150,11 +166,12 @@ func TestInitAndApply(t *testing.T) {
 	}
 
 	want := runCall{
-		dir:  stateDir,
-		name: "/bin/mise",
-		args: []string{"-C", stateDir, "bootstrap", "--yes"},
+		dir:         stateDir,
+		environment: miseStateEnvironment(stateDir),
+		name:        "/bin/mise",
+		args:        []string{"-C", stateDir, "bootstrap", "--yes"},
 	}
-	if len(runner.runs) != 4 || !reflect.DeepEqual(runner.runs[3], want) {
+	if len(runner.runs) != 3 || !reflect.DeepEqual(runner.runs[2], want) {
 		t.Fatalf("runs = %#v, want final call %#v", runner.runs, want)
 	}
 	wantTrust := runCall{
@@ -173,7 +190,7 @@ func TestInitAndApply(t *testing.T) {
 	}
 }
 
-func TestApplyDryRunExplainsTheInitialMiseTrustWarning(t *testing.T) {
+func TestApplyDryRunPinsTheSelectedState(t *testing.T) {
 	root := t.TempDir()
 	stateDir := filepath.Join(root, "state")
 	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
@@ -192,25 +209,17 @@ func TestApplyDryRunExplainsTheInitialMiseTrustWarning(t *testing.T) {
 	if err := application.Run(context.Background(), []string{"apply", "--dry-run"}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "no primeiro dry-run") {
-		t.Fatalf("dry-run output does not explain the one-time warning: %q", out.String())
+	if strings.Contains(out.String(), "não é confiável") {
+		t.Fatalf("isolated dry-run still warns about another global config: %q", out.String())
 	}
 	want := runCall{
-		dir:  stateDir,
-		name: "/bin/mise",
-		args: []string{"-C", stateDir, "bootstrap", "--dry-run"},
+		dir:         stateDir,
+		environment: miseStateEnvironment(stateDir),
+		name:        "/bin/mise",
+		args:        []string{"-C", stateDir, "bootstrap", "--dry-run"},
 	}
-	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1], want) {
+	if len(runner.runs) != 1 || !reflect.DeepEqual(runner.runs[0], want) {
 		t.Fatalf("runs = %#v, want %#v", runner.runs, want)
-	}
-}
-
-func TestMiseTrustOutputRejectsAnyUntrustedConfig(t *testing.T) {
-	if miseTrustOutputIsTrusted("/parent: trusted\n/state: untrusted\n") {
-		t.Fatal("mixed trust output was accepted")
-	}
-	if !miseTrustOutputIsTrusted("/parent: trusted\n/state: trusted\n") {
-		t.Fatal("fully trusted output was rejected")
 	}
 }
 
@@ -263,7 +272,7 @@ func TestDotfileAddPinsTheStateConfig(t *testing.T) {
 		"--mode", "copy",
 		"/tmp/example",
 	}
-	if len(runner.runs) != 3 || !reflect.DeepEqual(runner.runs[2].args, want) {
+	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1].args, want) {
 		t.Fatalf("mise args = %#v, want %#v", runner.runs, want)
 	}
 }
@@ -288,7 +297,7 @@ func TestDotfileAddResolvesRelativePathFromWorkingDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := filepath.Join(workDir, "config", "example.toml")
-	if got := runner.runs[2].args[len(runner.runs[2].args)-1]; got != want {
+	if got := runner.runs[1].args[len(runner.runs[1].args)-1]; got != want {
 		t.Fatalf("relative target = %q, want %q", got, want)
 	}
 }
@@ -366,7 +375,7 @@ func TestDiffUsesNativeMiseDiff(t *testing.T) {
 		"-C", stateDir,
 		"bootstrap", "dotfiles", "diff",
 	}
-	if len(runner.runs) != 3 || !reflect.DeepEqual(runner.runs[2].args, want) {
+	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1].args, want) {
 		t.Fatalf("mise args = %#v, want %#v", runner.runs, want)
 	}
 }
@@ -392,7 +401,7 @@ func TestPlanUsesFullBootstrapDryRun(t *testing.T) {
 	}
 
 	want := []string{"-C", stateDir, "bootstrap", "--dry-run"}
-	if len(runner.runs) != 3 || !reflect.DeepEqual(runner.runs[2].args, want) {
+	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1].args, want) {
 		t.Fatalf("mise args = %#v, want %#v", runner.runs, want)
 	}
 }

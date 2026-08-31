@@ -120,11 +120,14 @@ func (a *App) runToolAdd(ctx context.Context, args []string) error {
 	if !bytes.Equal(before, currentBytes) {
 		return errors.New("mise.toml mudou durante a revisão; execute o comando novamente")
 	}
-	if err := a.options.Runner.RunEnv(ctx, stateDir, []string{"MISE_AUTO_INSTALL=false"}, misePath,
+	writeEnvironment := append(miseStateEnvironment(stateDir), "MISE_AUTO_INSTALL=false")
+	if err := a.options.Runner.RunEnv(ctx, stateDir, writeEnvironment, misePath,
 		toolConfigSetArgs(configPath, answer)...); err != nil {
 		return fmt.Errorf("mise config set: %w", err)
 	}
-	if err := a.options.Runner.Run(ctx, stateDir, misePath, "trust", configPath); err != nil {
+	if err := a.options.Runner.RunEnv(
+		ctx, stateDir, miseStateEnvironment(stateDir), misePath, "trust", configPath,
+	); err != nil {
 		return fmt.Errorf("ferramenta gravada, mas não foi possível confiar no mise.toml: %w", err)
 	}
 	if _, err := a.stateTrust().Trust(stateDir); err != nil {
@@ -151,11 +154,11 @@ func (a *App) previewToolConfig(
 	if err := os.WriteFile(temporaryConfig, before, 0o600); err != nil {
 		return nil, err
 	}
-	environment := []string{
+	environment := append(miseStateEnvironment(temporaryDir),
 		"MISE_AUTO_INSTALL=false",
-		"MISE_TRUSTED_CONFIG_PATHS=" + temporaryDir,
-	}
-	if err := a.options.Runner.RunEnv(ctx, stateDir, environment, misePath,
+		"MISE_TRUSTED_CONFIG_PATHS="+temporaryDir,
+	)
+	if err := a.options.Runner.RunEnv(ctx, temporaryDir, environment, misePath,
 		toolConfigSetArgs(temporaryConfig, answer)...); err != nil {
 		return nil, fmt.Errorf("o mise recusou a ferramenta ou a versão: %w", err)
 	}

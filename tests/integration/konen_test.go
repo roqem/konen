@@ -148,14 +148,16 @@ func TestFirstRunJourneyThroughBuiltExecutable(t *testing.T) {
 	writeExecutable(t, filepath.Join(binDir, "mise"), `#!/bin/sh
 set -eu
 printf '%s\n' "$*" >> "$KONEN_TEST_MISE_LOG"
+printf 'state-env=%s|%s|%s|%s\n' \
+  "${MISE_GLOBAL_CONFIG_FILE:-}" \
+  "${MISE_GLOBAL_CONFIG_ROOT:-}" \
+  "${MISE_CEILING_PATHS:-}" \
+  "${MISE_OVERRIDE_CONFIG_FILENAMES:-}" >> "$KONEN_TEST_MISE_LOG"
 if [ "${1:-}" = "--version" ]; then
   printf '2026.8.15 linux-x64 (integration fixture)\n'
   exit 0
 fi
 case " $* " in
-  *" trust --show "*)
-    printf '%s: trusted\n' "$PWD"
-    ;;
   *" bootstrap status --json "*)
     printf '%s\n' '{"tools":[{"tool":"go","requested_version":"1.27.0","resolved_version":"1.27.0","state":"installed","installed":true}]}'
     ;;
@@ -257,12 +259,12 @@ hold = true
 	log := string(logData)
 	for _, invocation := range []string{
 		"trust " + filepath.Join(stateDir, "mise.toml"),
-		"trust --show",
 		"bootstrap status --json",
 		"bootstrap --dry-run",
 	} {
 		assertContains(t, log, invocation)
 	}
+	assertContains(t, log, "state-env="+filepath.Join(stateDir, "mise.toml")+"|"+stateDir+"|"+stateDir+"|mise.toml")
 	if strings.Contains(log, "bootstrap --yes") {
 		t.Fatalf("journey unexpectedly applied host changes:\n%s", log)
 	}

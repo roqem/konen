@@ -27,6 +27,8 @@ A primeira fundação pública já cobre:
 - projetos aprovados e abertos em abas do Kitty;
 - menu, autocomplete e diagnóstico;
 - bootstrap completo e reaplicação idempotente numa VM Ubuntu 26.04 limpa.
+- isolamento do estado ativo nas operações do mise e seleção de etapas por
+  checkboxes ou `--only`.
 
 ## Marco 1 — edição guiada do estado
 

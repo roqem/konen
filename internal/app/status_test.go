@@ -34,10 +34,10 @@ func TestStatusRequestsJSONFromMise(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := runCall{
-		dir: stateDir, name: "/bin/mise",
+		dir: stateDir, environment: miseStateEnvironment(stateDir), name: "/bin/mise",
 		args: []string{"-C", stateDir, "bootstrap", "status", "--json"},
 	}
-	if len(runner.runs) != 3 || !reflect.DeepEqual(runner.runs[2], want) {
+	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1], want) {
 		t.Fatalf("status call = %#v, want %#v", runner.runs, want)
 	}
 	if !strings.Contains(out.String(), "Ferramenta") || !strings.Contains(out.String(), "go") {
@@ -79,17 +79,12 @@ func TestFormatMiseStatusUsesUnifiedTableAndKeepsUnknownKinds(t *testing.T) {
 	}
 }
 
-func TestStatusRefusesUntrustedStateWithoutReadingIt(t *testing.T) {
+func TestStatusRefusesLocallyUnapprovedStateWithoutReadingIt(t *testing.T) {
 	root := t.TempDir()
 	stateDir := filepath.Join(root, "state")
 	runner := &fakeRunner{
-		paths: map[string]string{"mise": "/bin/mise"},
-		outputHook: func(call runCall) (string, error) {
-			if len(call.args) >= 2 && call.args[len(call.args)-2] == "trust" && call.args[len(call.args)-1] == "--show" {
-				return stateDir + ": untrusted\n", nil
-			}
-			return "", errors.New("untrusted state was read")
-		},
+		paths:      map[string]string{"mise": "/bin/mise"},
+		outputHook: func(runCall) (string, error) { return "", errors.New("untrusted state was read") },
 	}
 	application := New(Options{
 		ConfigPath: filepath.Join(root, "config.toml"),
@@ -98,13 +93,16 @@ func TestStatusRefusesUntrustedStateWithoutReadingIt(t *testing.T) {
 	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(stateDir, "mise.toml"), []byte("[tools]\nnode = \"lts\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	runner.runs = nil
 
 	err := application.Run(context.Background(), []string{"status"})
 	if err == nil || !strings.Contains(err.Error(), "konen trust") {
 		t.Fatalf("status error = %v", err)
 	}
-	if len(runner.runs) != 1 || !reflect.DeepEqual(runner.runs[0].args, []string{"-C", stateDir, "trust", "--show"}) {
+	if len(runner.runs) != 0 {
 		t.Fatalf("untrusted status calls = %#v", runner.runs)
 	}
 }
@@ -184,5 +182,22 @@ func TestFormatMiseStatusCompactsCurrentPackageAndRepoShapes(t *testing.T) {
 		if strings.Contains(got, unwanted) {
 			t.Errorf("compact status contains %q:\n%s", unwanted, got)
 		}
+	}
+}
+
+func TestFormatMiseStatusLocalizesMissingDotfileSource(t *testing.T) {
+	input := []byte(`{
+  "dotfiles": {"files": [{
+    "target": "~/.zshrc", "source": "home/.zshrc",
+    "mode": "copy", "state": "source_missing"
+  }]}
+}`)
+
+	got, err := formatMiseStatus(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "fonte ausente") {
+		t.Fatalf("localized status = %q", got)
 	}
 }

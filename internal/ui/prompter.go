@@ -34,11 +34,18 @@ type ToolAnswer struct {
 	Version string
 }
 
+type ApplyPart struct {
+	Key         string
+	Label       string
+	Description string
+}
+
 type Prompter interface {
 	Menu(configured bool) (string, error)
 	Init(defaultPath string) (InitAnswer, error)
 	AddTarget() (string, error)
 	Tool(ToolAnswer) (ToolAnswer, error)
+	ChooseApplyParts([]ApplyPart) ([]string, error)
 	Confirm(string) (bool, error)
 	Project(ProjectAnswer) (ProjectAnswer, error)
 	ChooseProject([]string) (string, error)
@@ -74,8 +81,8 @@ func menuKeyMap() *huh.KeyMap {
 func (p HuhPrompter) Menu(configured bool) (string, error) {
 	var action string
 	options := []huh.Option[string]{
-		huh.NewOption(CommandLabel("plan", "revisar o que mudaria", 13), "plan"),
-		huh.NewOption(CommandLabel("apply", "preparar esta máquina", 13), "apply"),
+		huh.NewOption(CommandLabel("plan", "revisar etapas escolhidas", 13), "__plan_select"),
+		huh.NewOption(CommandLabel("apply", "aplicar etapas escolhidas", 13), "__apply_select"),
 		huh.NewOption(CommandLabel("dev", "abrir um projeto", 13), "dev"),
 		huh.NewOption(CommandLabel("status", "ver tudo configurado", 13), "status"),
 		huh.NewOption(CommandLabel("tool add", "adicionar uma ferramenta", 13), "__tool_add"),
@@ -167,6 +174,25 @@ func (p HuhPrompter) Tool(answer ToolAnswer) (ToolAnswer, error) {
 	answer.Name = strings.TrimSpace(answer.Name)
 	answer.Version = strings.TrimSpace(answer.Version)
 	return answer, nil
+}
+
+func (p HuhPrompter) ChooseApplyParts(parts []ApplyPart) ([]string, error) {
+	selected := make([]string, 0, len(parts))
+	options := make([]huh.Option[string], 0, len(parts))
+	for _, part := range parts {
+		selected = append(selected, part.Key)
+		options = append(options, huh.NewOption(
+			CommandLabel(part.Label, part.Description, 20), part.Key,
+		).Selected(true))
+	}
+	form := huh.NewForm(huh.NewGroup(
+		huh.NewMultiSelect[string]().
+			Title("Quais etapas deseja considerar?").
+			Description("Espaço marca ou desmarca; Enter continua.").
+			Options(options...).
+			Value(&selected),
+	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
+	return selected, form.Run()
 }
 
 func (p HuhPrompter) Confirm(title string) (bool, error) {

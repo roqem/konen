@@ -80,7 +80,7 @@ func (a *App) run(ctx context.Context, args []string) error {
 	case "status":
 		return a.runStatus(ctx, args[1:])
 	case "plan":
-		return a.runApply(ctx, []string{"--dry-run"})
+		return a.runApply(ctx, append([]string{"--dry-run"}, args[1:]...))
 	case "diff":
 		return a.runMise(ctx, []string{"bootstrap", "dotfiles", "diff"})
 	case "apply":
@@ -110,6 +110,10 @@ func (a *App) run(ctx context.Context, args []string) error {
 		return a.runDotfile(ctx, []string{"add"})
 	case "__tool_add":
 		return a.runTool(ctx, []string{"add"})
+	case "__plan_select":
+		return a.runApply(ctx, []string{"--dry-run", "--select"})
+	case "__apply_select":
+		return a.runApply(ctx, []string{"--select"})
 	case "__exit":
 		return nil
 	case "__complete":
@@ -212,23 +216,46 @@ func (a *App) runApply(ctx context.Context, args []string) error {
 	flags.SetOutput(a.options.Err)
 	yes := flags.Bool("yes", false, "não pede confirmação")
 	dryRun := flags.Bool("dry-run", false, "mostra o plano sem alterar a máquina")
+	selectParts := flags.Bool("select", false, "escolhe as etapas interativamente")
+	var only commaListFlag
+	flags.Var(&only, "only", "limita a etapas separadas por vírgula")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 {
 		return errors.New("apply não aceita argumentos posicionais")
 	}
+	if *selectParts && len(only) > 0 {
+		return errors.New("use apenas uma forma de seleção: --select ou --only")
+	}
+	if *selectParts && !a.options.Interactive {
+		return errors.New("--select precisa de um terminal interativo; use --only ETAPAS em automações")
+	}
+	if *selectParts {
+		selected, err := a.chooseApplyParts()
+		if err != nil {
+			return err
+		}
+		if len(selected) == 0 {
+			fmt.Fprintln(a.options.Out, "Nenhuma etapa selecionada; nada será alterado.")
+			return nil
+		}
+		only = selected
+	}
+	if err := validateApplyParts(only); err != nil {
+		return err
+	}
 
 	miseArgs := []string{"bootstrap"}
+	if len(only) > 0 {
+		miseArgs = append(miseArgs, "--only", strings.Join(only, ","))
+		fmt.Fprintf(a.options.Out, "Etapas selecionadas: %s\n", strings.Join(applyPartLabels(only), ", "))
+	}
 	if *yes {
 		miseArgs = append(miseArgs, "--yes")
 	}
 	if *dryRun {
 		miseArgs = append(miseArgs, "--dry-run")
-		globalMiseConfig := filepath.Join(a.options.HomeDir, ".config", "mise", "config.toml")
-		if _, err := os.Lstat(globalMiseConfig); errors.Is(err, fs.ErrNotExist) {
-			fmt.Fprintln(a.options.Out, "Nota: no primeiro dry-run, o mise pode avisar que ~/.config/mise/config.toml ainda não é confiável; o arquivo só será criado pelo apply.")
-		}
 	}
 	return a.runMise(ctx, miseArgs)
 }
@@ -337,13 +364,25 @@ func (a *App) runMise(ctx context.Context, args []string) error {
 		return err
 	}
 	miseArgs := append([]string{"-C", stateDir}, args...)
-	if err := a.options.Runner.Run(ctx, stateDir, misePath, miseArgs...); err != nil {
+	if err := a.options.Runner.RunEnv(ctx, stateDir, miseStateEnvironment(stateDir), misePath, miseArgs...); err != nil {
 		return fmt.Errorf("mise: %w", err)
 	}
 	return nil
 }
 
-func (a *App) loadTrustedMise(ctx context.Context) (string, string, error) {
+// miseStateEnvironment makes the selected Konen state the complete machine
+// configuration for managed operations. Otherwise mise also merges a
+// previously linked global config and files found in ancestor directories.
+func miseStateEnvironment(stateDir string) []string {
+	return []string{
+		"MISE_GLOBAL_CONFIG_FILE=" + filepath.Join(stateDir, "mise.toml"),
+		"MISE_GLOBAL_CONFIG_ROOT=" + stateDir,
+		"MISE_CEILING_PATHS=" + stateDir,
+		"MISE_OVERRIDE_CONFIG_FILENAMES=mise.toml",
+	}
+}
+
+func (a *App) loadTrustedMise(_ context.Context) (string, string, error) {
 	stateDir, err := a.loadState()
 	if err != nil {
 		return "", "", err
@@ -359,28 +398,7 @@ func (a *App) loadTrustedMise(ctx context.Context) (string, string, error) {
 	if err != nil {
 		return "", "", errors.New("mise não está instalado; consulte https://mise.jdx.dev/installing-mise.html")
 	}
-	output, err := a.options.Runner.Output(ctx, stateDir, misePath, "-C", stateDir, "trust", "--show")
-	if err != nil {
-		return "", "", fmt.Errorf("não foi possível consultar a confiança do estado: %w", err)
-	}
-	if !miseTrustOutputIsTrusted(output) {
-		return "", "", fmt.Errorf("estado ainda não confiado; revise %s e execute `konen trust`", filepath.Join(stateDir, "mise.toml"))
-	}
 	return stateDir, misePath, nil
-}
-
-func miseTrustOutputIsTrusted(output string) bool {
-	trusted := false
-	for _, line := range strings.Split(output, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasSuffix(line, ": untrusted") {
-			return false
-		}
-		if strings.HasSuffix(line, ": trusted") {
-			trusted = true
-		}
-	}
-	return trusted
 }
 
 func (a *App) runTrust(ctx context.Context, args []string) error {
@@ -548,8 +566,10 @@ func (a *App) printHelp() {
 		{"konen init [--git] [DIR]", "configura ou cria o estado"},
 		{"konen init --from ORIGEM [DIR]", "clona um estado; GitHub privado tem login assistido"},
 		{"konen status", "mostra tudo que o estado declara"},
-		{"konen plan", "mostra exatamente o que mudaria"},
-		{"konen apply [--dry-run]", "aplica o estado com mise"},
+		{"konen plan [--select]", "mostra o plano completo ou escolhe etapas"},
+		{"konen plan --only ETAPAS", "mostra somente etapas separadas por vírgula"},
+		{"konen apply [--select]", "aplica o estado completo ou escolhe etapas"},
+		{"konen apply --only ETAPAS", "aplica somente etapas separadas por vírgula"},
 		{"konen trust", "confia no mise.toml após revisão"},
 		{"konen doctor", "diagnostica a instalação"},
 	})

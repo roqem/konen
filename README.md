@@ -35,7 +35,7 @@ selecionadas automaticamente:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.7 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.8 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -221,6 +221,35 @@ ruby = "3.4"
 `latest` acompanha a versão mais recente; uma versão como `3.4` limita a
 atualização à família escolhida. `konen status` mostra a versão pedida, a versão
 resolvida e se ela já está instalada.
+
+### Escolhendo o que aplicar
+
+O plano completo continua disponível sem perguntas com `konen plan`. Para
+revisar apenas algumas etapas, abra o seletor:
+
+```console
+konen plan --select
+```
+
+Os checkboxes trabalham por etapa — pacotes, repositórios, dotfiles,
+ferramentas e tarefas pessoais — para preservar as dependências internas de
+cada grupo. O mesmo seletor pode iniciar uma aplicação parcial:
+
+```console
+konen apply --select
+```
+
+Em scripts, servidores ou outros terminais não interativos, informe as etapas
+explicitamente:
+
+```console
+konen plan --only tools,dotfiles
+konen apply --only tools,dotfiles
+```
+
+Durante essas operações, o Konen limita o mise ao estado atualmente
+configurado. Uma configuração global anterior ou arquivos de versão encontrados
+em pastas ancestrais não são misturados ao plano.
 
 ### Pacotes do sistema
 
@@ -446,8 +475,11 @@ aprovação local separada; uma edição ou pull exige
 | `konen` | Abre o menu interativo. |
 | `konen status` | Mostra o que existe, falta ou está diferente. |
 | `konen plan` | Simula a aplicação completa sem alterar a máquina. |
+| `konen plan --select` | Escolhe por checkboxes quais etapas entram no plano. |
 | `konen diff` | Mostra diferenças nos dotfiles gerenciados. |
 | `konen apply` | Aplica o estado pedindo confirmações. |
+| `konen apply --select` | Escolhe por checkboxes quais etapas serão aplicadas. |
+| `konen apply --only tools,dotfiles` | Aplica somente as etapas informadas. |
 | `konen apply --yes` | Aplica sem perguntas; use somente depois de revisar o plano. |
 | `konen trust` | Aprova localmente o estado executável que você revisou. |
 | `konen tool add [NOME] [VERSÃO]` | Adiciona uma ferramenta ao estado mostrando o diff. |

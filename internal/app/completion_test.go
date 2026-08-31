@@ -17,9 +17,9 @@ func TestCompletionScriptsCoverCommandsAndDynamicProjects(t *testing.T) {
 		"edit", "list", "show", "__complete projects",
 	}
 	options := map[string][]string{
-		"zsh":  {"--git", "--from", "--yes", "--dry-run", "--mode"},
-		"bash": {"--git", "--from", "--yes", "--dry-run", "--mode"},
-		"fish": {"-l git", "-l from", "-l yes", "-l dry-run", "-l mode"},
+		"zsh":  {"--git", "--from", "--yes", "--dry-run", "--select", "--only", "--mode"},
+		"bash": {"--git", "--from", "--yes", "--dry-run", "--select", "--only", "--mode"},
+		"fish": {"-l git", "-l from", "-l yes", "-l dry-run", "-l select", "-l only", "-l mode"},
 	}
 	for _, shell := range []string{"zsh", "bash", "fish"} {
 		script, err := completionScript(shell)

@@ -38,6 +38,10 @@ func (f *fakeRunner) Output(_ context.Context, _, _ string, _ ...string) (string
 	return "", nil
 }
 
+func (f *fakeRunner) OutputEnv(_ context.Context, _ string, _ []string, _ string, _ ...string) (string, error) {
+	return "", nil
+}
+
 func TestPrepareLocalCreatesPortableState(t *testing.T) {
 	runner := &fakeRunner{}
 	path := filepath.Join(t.TempDir(), "state")
