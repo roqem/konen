@@ -5,9 +5,14 @@ set -euo pipefail
 version="${1:-}"
 version="${version#v}"
 
+if [[ $# -gt 2 ]]; then
+  echo "uso: scripts/build-release.sh <versão> [diretório de saída]" >&2
+  exit 2
+fi
+
 case "$version" in
   "" | *[!0-9A-Za-z._-]*)
-    echo "uso: scripts/build-release.sh <versão>" >&2
+    echo "uso: scripts/build-release.sh <versão> [diretório de saída]" >&2
     exit 2
     ;;
 esac
@@ -20,7 +25,10 @@ for required_command in go git tar gzip sha256sum install find; do
 done
 
 repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-dist_dir="$repository_root/dist"
+dist_dir="${2:-$repository_root/dist}"
+if [[ "$dist_dir" != /* ]]; then
+  dist_dir="$repository_root/$dist_dir"
+fi
 
 if [[ -d "$dist_dir" ]] && [[ -n "$(find "$dist_dir" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
   echo "dist/ não está vazio; preserve ou remova os artefatos existentes antes de continuar" >&2

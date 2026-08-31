@@ -61,6 +61,15 @@ func (unusedPrompter) ChooseProject([]string) (string, error) {
 	return "", errors.New("unexpected prompt")
 }
 
+type projectPrompter struct {
+	unusedPrompter
+	answer ui.ProjectAnswer
+}
+
+func (p projectPrompter) Project(ui.ProjectAnswer) (ui.ProjectAnswer, error) {
+	return p.answer, nil
+}
+
 var _ execx.Runner = (*fakeRunner)(nil)
 
 func TestInitAndApply(t *testing.T) {
@@ -242,6 +251,71 @@ func TestProjectsListsThroughPluralCommand(t *testing.T) {
 		if !strings.Contains(out.String(), fragment) {
 			t.Fatalf("projects output is missing %q: %s", fragment, out.String())
 		}
+	}
+}
+
+func TestProjectAddGuidedFlowSavesAndTrustsManifest(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	stateDir := filepath.Join(root, "state")
+	projectDir := filepath.Join(home, "Projects", "sample")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
+	var out bytes.Buffer
+	application := New(Options{
+		ConfigPath:  filepath.Join(root, "config", "config.toml"),
+		HomeDir:     home,
+		WorkDir:     projectDir,
+		Out:         &out,
+		Err:         &out,
+		Runner:      runner,
+		Interactive: true,
+		Prompter: projectPrompter{answer: ui.ProjectAnswer{
+			Name: "sample", Path: projectDir, KeepInvokingTab: true,
+			Tabs: []ui.ProjectTabAnswer{{Title: "Terminal", Command: "git status", Hold: true}},
+		}},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+
+	if err := application.Run(context.Background(), []string{"project", "add"}); err != nil {
+		t.Fatal(err)
+	}
+	assertOutputContains(t, out.String(), "Projeto cadastrado e aprovado: sample")
+
+	store := project.Store{StateDir: stateDir, HomeDir: home}
+	manifest, manifestPath, err := store.Load("sample")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Path != "~/Projects/sample" || len(manifest.Tabs) != 1 || manifest.Tabs[0].Command != "git status" {
+		t.Fatalf("saved manifest = %#v", manifest)
+	}
+	trusted, err := application.projectTrust().IsTrusted(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !trusted {
+		t.Fatal("manifest created by the guided flow was not trusted")
+	}
+
+	out.Reset()
+	if err := application.Run(context.Background(), []string{"projects"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, fragment := range []string{"sample", "aprovado", "~/Projects/sample"} {
+		assertOutputContains(t, out.String(), fragment)
+	}
+}
+
+func assertOutputContains(t *testing.T, output, fragment string) {
+	t.Helper()
+	if !strings.Contains(output, fragment) {
+		t.Fatalf("output does not contain %q: %s", fragment, output)
 	}
 }
 

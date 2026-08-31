@@ -147,7 +147,8 @@ go build ./cmd/konen
 ```
 
 See [docs/architecture.md](docs/architecture.md) for the scope and extension
-decisions.
+decisions. Release candidates must also pass the isolated installer and
+first-run journeys described in [docs/testing.md](docs/testing.md).
 
 ## License
 
