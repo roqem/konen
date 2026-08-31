@@ -84,6 +84,7 @@ being scattered as Kitty files across source repositories:
 ```console
 cd ~/Documents/Projects/my-app
 konen project add
+konen projects
 konen dev --dry-run
 konen dev
 ```

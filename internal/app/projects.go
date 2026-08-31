@@ -49,7 +49,7 @@ func (a *App) runProject(ctx context.Context, args []string) error {
 			}
 			rows = append(rows, []string{item.Name, approval, item.Manifest.Path})
 		}
-		fmt.Fprint(a.options.Out, ui.RenderTable([]string{"PROJETO", "APROVAÇÃO", "PASTA"}, rows))
+		fmt.Fprint(a.options.Out, ui.RenderTable([]string{"Projeto", "Aprovação", "Pasta"}, rows))
 		return nil
 	case "show":
 		if len(args) != 2 {
@@ -440,7 +440,7 @@ func (a *App) printProjectPlan(name, dir string, manifest project.Manifest) {
 		}
 		rows = append(rows, []string{tab.Title, command, afterExit})
 	}
-	fmt.Fprint(a.options.Out, ui.RenderTable([]string{"ABA", "COMANDO", "APÓS SAIR"}, rows))
+	fmt.Fprint(a.options.Out, ui.RenderTable([]string{"Aba", "Comando", "Após sair"}, rows))
 }
 
 func renderKittySession(dir, shell string, manifest project.Manifest) string {

@@ -69,6 +69,7 @@ _konen() {
     'diff:mostra diferenças dos dotfiles'
     'apply:aplica o estado com mise'
     'add:adiciona um arquivo ou diretório'
+    'projects:lista os projetos cadastrados'
     'project:gerencia projetos e suas sessões'
     'dev:abre um projeto no Kitty'
     'trust:confia no estado após revisão'
@@ -101,7 +102,7 @@ _konen() {
         '--from=[clona um repositório Git]:URL do repositório:_urls' \
         '1:pasta do estado:_directories'
       ;;
-    status|plan|diff|trust|doctor|version|help)
+    status|plan|diff|projects|trust|doctor|version|help)
       _arguments
       ;;
     apply)
@@ -154,7 +155,7 @@ const bashCompletion = `_konen_completion() {
   command="${COMP_WORDS[1]}"
 
   if [[ $COMP_CWORD -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W 'init status plan diff apply add project dev trust doctor completion version help' -- "$current") )
+    COMPREPLY=( $(compgen -W 'init status plan diff apply add projects project dev trust doctor completion version help' -- "$current") )
     return
   fi
 
@@ -207,6 +208,7 @@ complete -c konen -n '__fish_use_subcommand' -a plan -d 'Mostra exatamente o que
 complete -c konen -n '__fish_use_subcommand' -a diff -d 'Mostra diferenças dos dotfiles'
 complete -c konen -n '__fish_use_subcommand' -a apply -d 'Aplica o estado com mise'
 complete -c konen -n '__fish_use_subcommand' -a add -d 'Adiciona um arquivo ou diretório'
+complete -c konen -n '__fish_use_subcommand' -a projects -d 'Lista os projetos cadastrados'
 complete -c konen -n '__fish_use_subcommand' -a project -d 'Gerencia projetos e suas sessões'
 complete -c konen -n '__fish_use_subcommand' -a dev -d 'Abre um projeto no Kitty'
 complete -c konen -n '__fish_use_subcommand' -a trust -d 'Confia no estado após revisão'

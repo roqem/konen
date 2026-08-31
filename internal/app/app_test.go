@@ -215,6 +215,36 @@ func TestPlanUsesNativeMisePlan(t *testing.T) {
 	}
 }
 
+func TestProjectsListsThroughPluralCommand(t *testing.T) {
+	root := t.TempDir()
+	stateDir := filepath.Join(root, "state")
+	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
+	var out bytes.Buffer
+	application := New(Options{
+		ConfigPath: filepath.Join(root, "config.toml"),
+		HomeDir:    root, Out: &out, Err: &out, Runner: runner, Prompter: unusedPrompter{},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	store := project.Store{StateDir: stateDir, HomeDir: root}
+	if _, err := store.Save("sample", project.Manifest{
+		Version: 1, Path: root, Tabs: []project.Tab{{Title: "Terminal"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+
+	if err := application.Run(context.Background(), []string{"projects"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, fragment := range []string{"Projeto", "Aprovação", "Pasta", "sample"} {
+		if !strings.Contains(out.String(), fragment) {
+			t.Fatalf("projects output is missing %q: %s", fragment, out.String())
+		}
+	}
+}
+
 func TestExistingStateNeedsExplicitTrust(t *testing.T) {
 	root := t.TempDir()
 	stateDir := filepath.Join(root, "state")

@@ -70,7 +70,7 @@ func (a *App) Run(ctx context.Context, args []string) error {
 	case "init":
 		return a.runInit(ctx, args[1:])
 	case "status":
-		return a.runMise(ctx, []string{"bootstrap", "status"})
+		return a.runStatus(ctx, args[1:])
 	case "plan":
 		return a.runMise(ctx, []string{"bootstrap", "plan"})
 	case "diff":
@@ -87,6 +87,11 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return a.runDev(ctx, args[1:])
 	case "project":
 		return a.runProject(ctx, args[1:])
+	case "projects":
+		if len(args) != 1 {
+			return errors.New("projects não aceita argumentos")
+		}
+		return a.runProject(ctx, []string{"list"})
 	case "completion":
 		return a.runCompletion(args[1:])
 	case "__complete":
@@ -389,8 +394,9 @@ Uso:
   konen add [--mode MODE] CAMINHO...
   konen project add [DIR] cadastra um projeto e suas abas
   konen project edit NOME edita um projeto pelo assistente
-  konen project list      lista os projetos cadastrados
-  konen project show NOME mostra o manifest do projeto
+  konen projects           lista os projetos cadastrados
+  konen project list      alias compatível de konen projects
+  konen project show NOME mostra o manifesto do projeto
   konen project trust NOME aprova os comandos após revisão
   konen dev [NOME]        abre o projeto em abas do Kitty
   konen dev [NOME] --dry-run
