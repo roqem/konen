@@ -59,6 +59,9 @@ func TestPrepareLocalCreatesPortableState(t *testing.T) {
 	if !strings.Contains(string(data), `"~/.config/mise/config.toml" = { source = "mise.toml", mode = "symlink" }`) {
 		t.Fatalf("mise.toml does not expose machine tools through the global mise config:\n%s", data)
 	}
+	if !strings.Contains(string(data), `_.path = "{{ config_source | canonicalize | dirname }}/scripts/bin"`) {
+		t.Fatalf("mise.toml does not expose personal commands through the state directory:\n%s", data)
+	}
 	ignore, err := os.ReadFile(filepath.Join(path, ".gitignore"))
 	if err != nil {
 		t.Fatal(err)
@@ -74,6 +77,12 @@ func TestPrepareLocalCreatesPortableState(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(path, "projects", ".gitkeep")); err != nil {
 		t.Fatalf("projects directory was not initialized: %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(path, "scripts", "bin", ".gitkeep")); err != nil {
+		t.Fatalf("personal commands directory was not initialized: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(path, "mise-tasks", "install", ".gitkeep")); err != nil {
+		t.Fatalf("custom installers directory was not initialized: %v", err)
+	}
 	if len(runner.runs) != 1 || runner.runs[0][1] != "git" {
 		t.Fatalf("git init calls = %#v", runner.runs)
 	}
@@ -87,6 +96,22 @@ func TestPrepareLocalRefusesUnrelatedNonEmptyDirectory(t *testing.T) {
 	service := Service{Runner: &fakeRunner{}}
 	if err := service.PrepareLocal(context.Background(), path, false); err == nil {
 		t.Fatal("PrepareLocal() should refuse a non-empty unrelated directory")
+	}
+}
+
+func TestPrepareLocalDoesNotScaffoldAnExistingState(t *testing.T) {
+	path := t.TempDir()
+	if err := os.WriteFile(filepath.Join(path, "mise.toml"), []byte("[tools]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	service := Service{Runner: &fakeRunner{}}
+	if err := service.PrepareLocal(context.Background(), path, false); err != nil {
+		t.Fatal(err)
+	}
+	for _, unexpected := range []string{"home", "projects", "scripts", "mise-tasks", ".gitignore"} {
+		if _, err := os.Stat(filepath.Join(path, unexpected)); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("existing state was unexpectedly scaffolded at %s: %v", unexpected, err)
+		}
 	}
 }
 

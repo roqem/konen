@@ -182,6 +182,9 @@ func (a *App) runInit(ctx context.Context, args []string) error {
 		if err := a.options.Runner.Run(ctx, resolved, misePath, "trust", miseConfig); err != nil {
 			return fmt.Errorf("estado criado, mas não foi possível confiar no mise.toml: %w", err)
 		}
+		if _, err := a.stateTrust().Trust(resolved); err != nil {
+			return fmt.Errorf("estado criado, mas não foi possível registrar a aprovação local: %w", err)
+		}
 		trusted = true
 	}
 
@@ -280,7 +283,15 @@ func (a *App) runDotfileAdd(ctx context.Context, args []string) error {
 		miseArgs = append(miseArgs, "--mode", *mode)
 	}
 	miseArgs = append(miseArgs, targets...)
-	return a.runMise(ctx, miseArgs)
+	if err := a.runMise(ctx, miseArgs); err != nil {
+		return err
+	}
+	// This guided mutation changes mise.toml by exactly the targets the user
+	// supplied, so keep the local approval in sync with the resulting config.
+	if _, err := a.stateTrust().Trust(stateDir); err != nil {
+		return fmt.Errorf("dotfile adicionado, mas a aprovação local não pôde ser atualizada: %w", err)
+	}
+	return nil
 }
 
 func (a *App) validateDotfileTarget(target string) error {
@@ -333,6 +344,13 @@ func (a *App) loadTrustedMise(ctx context.Context) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
+	trusted, err := a.stateTrust().IsTrusted(stateDir)
+	if err != nil {
+		return "", "", fmt.Errorf("não foi possível validar a aprovação local do estado: %w", err)
+	}
+	if !trusted {
+		return "", "", fmt.Errorf("o mise.toml, um instalador ou um comando pessoal mudou; revise o estado e execute `konen trust`")
+	}
 	misePath, err := a.findCommand("mise")
 	if err != nil {
 		return "", "", errors.New("mise não está instalado; consulte https://mise.jdx.dev/installing-mise.html")
@@ -373,11 +391,22 @@ func (a *App) runTrust(ctx context.Context, args []string) error {
 	if err != nil {
 		return errors.New("mise não está instalado; consulte https://mise.jdx.dev/installing-mise.html")
 	}
+	if _, _, _, err := state.ExecutionDigest(stateDir); err != nil {
+		return fmt.Errorf("a superfície executável do estado não pode ser aprovada: %w", err)
+	}
 	miseConfig := filepath.Join(stateDir, "mise.toml")
 	if err := a.options.Runner.Run(ctx, stateDir, misePath, "trust", miseConfig); err != nil {
 		return fmt.Errorf("mise trust: %w", err)
 	}
+	files, err := a.stateTrust().Trust(stateDir)
+	if err != nil {
+		return fmt.Errorf("não foi possível registrar a aprovação local: %w", err)
+	}
 	fmt.Fprintf(a.options.Out, "Estado confiado: %s\n", miseConfig)
+	fmt.Fprintf(a.options.Out, "Superfície executável aprovada: %d arquivo(s).\n", len(files))
+	for _, file := range files {
+		fmt.Fprintf(a.options.Out, "  %s\n", file)
+	}
 	return nil
 }
 
@@ -392,6 +421,16 @@ func (a *App) runDoctor(ctx context.Context) error {
 	} else {
 		fmt.Fprintf(a.options.Out, "✓ configuração: %s\n", a.options.ConfigPath)
 		fmt.Fprintf(a.options.Out, "✓ estado: %s\n", stateDir)
+		trusted, trustErr := a.stateTrust().IsTrusted(stateDir)
+		switch {
+		case trustErr != nil:
+			fmt.Fprintf(a.options.Out, "✗ confiança: %v\n", trustErr)
+			healthy = false
+		case trusted:
+			fmt.Fprintln(a.options.Out, "✓ confiança: superfície executável aprovada")
+		default:
+			fmt.Fprintln(a.options.Out, "· confiança: revisão necessária; execute `konen trust`")
+		}
 	}
 
 	if path, err := a.findCommand("mise"); err != nil {
@@ -488,6 +527,10 @@ func (a *App) loadState() (string, error) {
 		return "", err
 	}
 	return cfg.StateDir, nil
+}
+
+func (a *App) stateTrust() state.TrustStore {
+	return state.TrustStore{Path: filepath.Join(filepath.Dir(a.options.ConfigPath), "state-trust.toml")}
 }
 
 func (a *App) printHelp() {

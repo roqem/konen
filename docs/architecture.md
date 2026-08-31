@@ -41,6 +41,11 @@ repository. Kitty remains the execution and layout engine.
   review; remote state is never trusted silently. Mise-backed reads and writes
   first check trust without forwarding stdin, so inspection cannot fall through
   to mise's interactive trust prompt.
+- Mise trust covers its configuration file, while Konen approval additionally
+  covers the content and executable mode of native file tasks and personal
+  commands. Changes under recognized mise task directories or `scripts/bin`
+  revoke approval before mise is invoked. Symlinks are rejected on that
+  executable surface so a trusted path cannot silently point outside state.
 - Secrets are not imported automatically and common plaintext secret files are
   ignored in newly created state repositories.
 - Project commands are approved by exact manifest digest in the local Konen
@@ -60,6 +65,11 @@ may support:
 - The state `mise.toml` is linked as mise's global user config. This makes
   machine-wide tools available in every directory while preserving the normal
   global-to-project override hierarchy.
+- Personal commands live under `scripts/bin` and are added through mise's
+  native `env._.path`; custom installers are native executable file tasks under
+  `mise-tasks/install`. A native `bootstrap` task selects which installers are
+  part of convergence. Konen provides visibility and content-aware approval,
+  not another task or installer format.
 - Configuration that is genuinely part of a project's reproducible build or
   contributor experience remains in that project.
 - Konen must not inject hidden project-local files merely to accommodate an

@@ -140,6 +140,10 @@ home/
 ├── .git/          # optional
 ├── .gitignore
 ├── mise.toml      # packages, tools, repos, services and dotfiles
+├── mise-tasks/
+│   └── install/   # explicit, idempotent custom installers
+├── scripts/
+│   └── bin/       # personal commands added to PATH by mise activation
 ├── home/          # source files managed by mise
 └── projects/      # Konen workspace manifests
 ```
@@ -151,9 +155,18 @@ projects and project-local mise files can override them. Konen never commits or
 pushes on your behalf.
 
 After trust, `konen status` lists every package, tool, service, repository and
-managed file declared by the state. `konen plan` runs the complete bootstrap
-dry run, showing dotfiles and tools as well as other pending changes before
-`konen apply`; Konen does not keep a second, hidden installation list.
+managed file declared by the state, plus personal commands and file-based
+installer tasks. `konen plan` runs the complete bootstrap dry run, showing
+dotfiles, tools and every custom installer selected by the `bootstrap` task
+before `konen apply`; Konen does not keep a second, hidden installation list.
+
+Custom behavior remains native mise state. Put directly invoked utilities in
+`scripts/bin`, executable installer tasks in `mise-tasks/install`, and select
+automatic installers through `[tasks.bootstrap].depends`. Konen hashes the
+contents and executable modes of `mise.toml`, every recognized mise file-task
+directory and `scripts/bin`; changing any of them blocks state-backed commands
+until `konen trust` is run again. Symbolic links are refused on this executable
+surface. See [docs/automation.md](docs/automation.md).
 
 ## Development
 

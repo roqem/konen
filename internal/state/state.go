@@ -18,10 +18,16 @@ const defaultMiseConfig = `min_version = "2026.8.15"
 dotfiles.root = "home"
 dotfiles.default_mode = "symlink"
 
+[env]
+# Resolve the real state directory even after mise.toml is linked globally.
+_.path = "{{ config_source | canonicalize | dirname }}/scripts/bin"
+
 [dotfiles]
 "~/.config/mise/config.toml" = { source = "mise.toml", mode = "symlink" }
 
-# Declare tools, packages, repositories and managed files here.
+# Declare tools, packages, repositories and managed files here. Put personal
+# commands in scripts/bin and custom installer tasks in mise-tasks/install.
+# A [tasks.bootstrap] entry may depend on installers that should run on apply.
 # ` + "`konen dotfile add ~/.zshrc`" + ` adds a dotfile without inventing a second format.
 `
 
@@ -54,27 +60,33 @@ func ResolvePath(input, homeDir string) (string, error) {
 }
 
 func (s Service) PrepareLocal(ctx context.Context, path string, initializeGit bool) error {
+	_, configErr := os.Stat(filepath.Join(path, "mise.toml"))
+	existingState := configErr == nil
+	if configErr != nil && !errors.Is(configErr, fs.ErrNotExist) {
+		return configErr
+	}
 	if err := ensureUsableDirectory(path); err != nil {
 		return err
 	}
 
-	if err := writeIfMissing(filepath.Join(path, "mise.toml"), []byte(defaultMiseConfig), 0o644); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Join(path, "home"), 0o755); err != nil {
-		return err
-	}
-	if err := writeIfMissing(filepath.Join(path, "home", ".gitkeep"), nil, 0o644); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Join(path, "projects"), 0o755); err != nil {
-		return err
-	}
-	if err := writeIfMissing(filepath.Join(path, "projects", ".gitkeep"), nil, 0o644); err != nil {
-		return err
-	}
-	if err := writeIfMissing(filepath.Join(path, ".gitignore"), []byte(defaultGitignore), 0o644); err != nil {
-		return err
+	if !existingState {
+		if err := writeIfMissing(filepath.Join(path, "mise.toml"), []byte(defaultMiseConfig), 0o644); err != nil {
+			return err
+		}
+		for _, directory := range []string{
+			"home", "projects", filepath.Join("scripts", "bin"), filepath.Join("mise-tasks", "install"),
+		} {
+			directoryPath := filepath.Join(path, directory)
+			if err := os.MkdirAll(directoryPath, 0o755); err != nil {
+				return err
+			}
+			if err := writeIfMissing(filepath.Join(directoryPath, ".gitkeep"), nil, 0o644); err != nil {
+				return err
+			}
+		}
+		if err := writeIfMissing(filepath.Join(path, ".gitignore"), []byte(defaultGitignore), 0o644); err != nil {
+			return err
+		}
 	}
 
 	if initializeGit {

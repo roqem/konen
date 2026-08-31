@@ -587,11 +587,12 @@ func TestExistingStateNeedsExplicitTrust(t *testing.T) {
 		t.Fatal(err)
 	}
 	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
+	var out bytes.Buffer
 	application := New(Options{
 		ConfigPath: filepath.Join(root, "config.toml"),
 		HomeDir:    root,
-		Out:        &bytes.Buffer{},
-		Err:        &bytes.Buffer{},
+		Out:        &out,
+		Err:        &out,
 		Runner:     runner,
 		Prompter:   unusedPrompter{},
 	})
@@ -612,6 +613,71 @@ func TestExistingStateNeedsExplicitTrust(t *testing.T) {
 	}
 	if len(runner.runs) != 1 || !reflect.DeepEqual(runner.runs[0], want) {
 		t.Fatalf("runs = %#v, want %#v", runner.runs, want)
+	}
+	for _, fragment := range []string{"Superfície executável aprovada", "mise.toml"} {
+		assertOutputContains(t, out.String(), fragment)
+	}
+}
+
+func TestChangedInstallerRevokesStateApprovalBeforeMiseRuns(t *testing.T) {
+	root := t.TempDir()
+	stateDir := filepath.Join(root, "state")
+	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}, outputs: map[string]string{
+		"/bin/mise": `{"tools":[]}`,
+	}}
+	application := New(Options{
+		ConfigPath: filepath.Join(root, "config.toml"), HomeDir: root,
+		Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, Runner: runner, Prompter: unusedPrompter{},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	installer := filepath.Join(stateDir, "mise-tasks", "install", "sample")
+	if err := os.WriteFile(installer, []byte("#!/bin/sh\nprintf changed\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner.runs = nil
+
+	err := application.Run(context.Background(), []string{"status"})
+	if err == nil || !strings.Contains(err.Error(), "instalador") || !strings.Contains(err.Error(), "konen trust") {
+		t.Fatalf("status error = %v", err)
+	}
+	if len(runner.runs) != 0 {
+		t.Fatalf("mise ran before Konen approval: %#v", runner.runs)
+	}
+}
+
+func TestTrustRejectsSymlinkedExecutableSurfaceBeforeMiseRuns(t *testing.T) {
+	root := t.TempDir()
+	stateDir := filepath.Join(root, "state")
+	if err := os.MkdirAll(filepath.Join(stateDir, "scripts", "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(stateDir, "mise.toml"), []byte("[tools]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(root, "outside-command")
+	if err := os.WriteFile(target, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(stateDir, "scripts", "bin", "unsafe")); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
+	application := New(Options{
+		ConfigPath: filepath.Join(root, "config.toml"), HomeDir: root,
+		Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, Runner: runner, Prompter: unusedPrompter{},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+
+	err := application.Run(context.Background(), []string{"trust"})
+	if err == nil || !strings.Contains(err.Error(), "não aceita links") {
+		t.Fatalf("trust error = %v", err)
+	}
+	if len(runner.runs) != 0 {
+		t.Fatalf("mise trusted unsafe state before validation: %#v", runner.runs)
 	}
 }
 

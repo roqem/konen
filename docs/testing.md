@@ -115,6 +115,28 @@ show an empty reset entry followed by the machine-local GitHub CLI helper. If
 pre-existing authentication made the initial clone succeed, no local entry is
 added and the existing mechanism remains untouched.
 
+If the remote state contains personal commands or custom installers, verify
+the content-aware approval boundary before applying it:
+
+```console
+konen status
+konen plan
+printf '\n# trust probe\n' >> "$HOME/remote-state-test/mise-tasks/install/EXAMPLE"
+konen status
+git -C "$HOME/remote-state-test" restore mise-tasks/install/EXAMPLE
+konen trust
+konen status
+```
+
+Replace `EXAMPLE` with a real installer task from the state. The first status
+must list it as an `Instalador pessoal`, and the plan must print its file-task
+command without executing it. After the edit, status must stop before invoking
+mise and require `konen trust`. Restoring the exact approved bytes and file mode
+restores the matching approval; keeping the edit requires a new explicit trust.
+Also add a temporary executable under `scripts/bin`, repeat the check and
+confirm it is listed as `Comando pessoal`. Symlinks in either executable
+directory must be rejected rather than approved.
+
 Finally, exercise a project without requiring a graphical terminal:
 
 ```console

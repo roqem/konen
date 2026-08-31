@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -115,5 +116,73 @@ func TestFormatMiseStatusHandlesEmptyState(t *testing.T) {
 	}
 	if got != "Nenhum item declarado no estado.\n" {
 		t.Fatalf("empty status = %q", got)
+	}
+}
+
+func TestFormatMiseStatusIncludesPersonalCommandsAndInstallers(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]os.FileMode{
+		"mise.toml":                         0o644,
+		"scripts/bin/hello":                 0o755,
+		"mise-tasks/install/docker":         0o755,
+		"mise-tasks/install/not-executable": 0o644,
+	}
+	for relative, mode := range files {
+		path := filepath.Join(root, filepath.FromSlash(relative))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("#!/bin/sh\n"), mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := formatMiseStatusWithState([]byte(`{"tools": []}`), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fragment := range []string{
+		"Comando pessoal", "hello", "scripts/bin/hello", "disponível",
+		"Instalador pessoal", "install:docker", "mise-tasks/install/docker",
+		"install:not-executable", "não executável",
+	} {
+		if !strings.Contains(got, fragment) {
+			t.Errorf("personal status is missing %q:\n%s", fragment, got)
+		}
+	}
+}
+
+func TestFormatMiseStatusCompactsCurrentPackageAndRepoShapes(t *testing.T) {
+	input := []byte(`{
+  "packages": {"apt": {"available": true, "packages": [{
+    "package": "curl", "requested_version": "latest",
+    "installed_version": "8.0", "state": "installed"
+  }]}},
+  "repos": [{
+    "path": "/home/test/.oh-my-zsh", "path_raw": "~/.oh-my-zsh",
+    "url": "https://github.com/ohmyzsh/ohmyzsh.git",
+    "origin": "https://github.com/ohmyzsh/ohmyzsh",
+    "current_ref": "master",
+    "current_sha": "1234567890abcdef1234567890abcdef12345678",
+    "reason": "", "state": "current"
+  }]
+}`)
+
+	got, err := formatMiseStatus(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fragment := range []string{
+		"Pacote (apt)", "curl", "Versão instalada: 8.0",
+		"~/.oh-my-zsh", "Referência atual: master", "Commit atual: 1234567890ab", "atual",
+	} {
+		if !strings.Contains(got, fragment) {
+			t.Errorf("compact status is missing %q:\n%s", fragment, got)
+		}
+	}
+	for _, unwanted := range []string{"Available", "Pacote · Apt · Pacote", "Origem atual", "1234567890abcdef"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("compact status contains %q:\n%s", unwanted, got)
+		}
 	}
 }

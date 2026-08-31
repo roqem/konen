@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/roqem/konen/internal/state"
 	"github.com/roqem/konen/internal/ui"
 )
 
@@ -31,7 +34,7 @@ func (a *App) runStatus(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("mise: %w", err)
 	}
-	formatted, err := formatMiseStatus([]byte(output))
+	formatted, err := formatMiseStatusWithState([]byte(output), stateDir)
 	if err != nil {
 		return fmt.Errorf("status do mise inválido: %w", err)
 	}
@@ -40,6 +43,10 @@ func (a *App) runStatus(ctx context.Context, args []string) error {
 }
 
 func formatMiseStatus(data []byte) (string, error) {
+	return formatMiseStatusWithState(data, "")
+}
+
+func formatMiseStatusWithState(data []byte, stateDir string) (string, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
 	var root map[string]any
@@ -51,6 +58,13 @@ func formatMiseStatus(data []byte) (string, error) {
 	for _, key := range orderedKeys(root, statusRootOrder) {
 		collectStatusRows([]string{key}, root[key], &rows)
 	}
+	if stateDir != "" {
+		personal, err := personalScriptRows(stateDir)
+		if err != nil {
+			return "", err
+		}
+		rows = append(rows, personal...)
+	}
 	if len(rows) == 0 {
 		return "Nenhum item declarado no estado.\n", nil
 	}
@@ -60,6 +74,51 @@ func formatMiseStatus(data []byte) (string, error) {
 		tableRows = append(tableRows, []string{row.kind, row.item, row.configuration, row.state})
 	}
 	return ui.RenderTable([]string{"Tipo", "Item", "Configuração", "Estado"}, tableRows), nil
+}
+
+func personalScriptRows(stateDir string) ([]statusRow, error) {
+	_, _, files, err := state.ExecutionDigest(stateDir)
+	if err != nil {
+		return nil, err
+	}
+	var rows []statusRow
+	for _, relative := range files {
+		if relative == "mise.toml" || strings.HasSuffix(relative, "/.gitkeep") {
+			continue
+		}
+		path := filepath.Join(stateDir, filepath.FromSlash(relative))
+		info, err := os.Stat(path)
+		if err != nil {
+			return nil, err
+		}
+		executable := info.Mode()&0o111 != 0
+		declaredState := "disponível"
+		if !executable {
+			declaredState = "não executável"
+		}
+		switch {
+		case state.IsPersonalCommand(relative):
+			name := strings.TrimPrefix(relative, "scripts/bin/")
+			rows = append(rows, statusRow{
+				kind: "Comando pessoal", item: name,
+				configuration: "Fonte: " + relative, state: declaredState,
+			})
+		default:
+			name, ok := state.TaskName(relative)
+			if !ok {
+				continue
+			}
+			kind := "Tarefa pessoal"
+			if strings.HasPrefix(name, "install:") {
+				kind = "Instalador pessoal"
+			}
+			rows = append(rows, statusRow{
+				kind: kind, item: name,
+				configuration: "Fonte: " + relative, state: declaredState,
+			})
+		}
+	}
+	return rows, nil
 }
 
 func collectStatusRows(path []string, value any, rows *[]statusRow) {
@@ -88,6 +147,9 @@ func collectStatusRows(path []string, value any, rows *[]statusRow) {
 			return
 		}
 		for _, key := range orderedKeys(typed, nil) {
+			if len(path) >= 1 && path[0] == "packages" && key == "available" {
+				continue
+			}
 			collectStatusRows(append(path, key), typed[key], rows)
 		}
 	default:
@@ -148,7 +210,16 @@ func statusRecord(path []string, record map[string]any, fallback string) statusR
 		if key == identityKey || key == "state" || key == "status" {
 			continue
 		}
-		details = append(details, fmt.Sprintf("%s: %s", statusField(key), statusValue(record[key])))
+		if statusDetailEmpty(record[key]) {
+			continue
+		}
+		if key == "path" && identityKey == "path_raw" {
+			continue
+		}
+		if key == "origin" && equivalentRepositoryURL(record["url"], record[key]) {
+			continue
+		}
+		details = append(details, fmt.Sprintf("%s: %s", statusField(key), statusDetailValue(key, record[key])))
 	}
 	configuration := "—"
 	if len(details) > 0 {
@@ -186,6 +257,9 @@ func statusKind(path []string) string {
 	if len(path) == 0 {
 		return "Estado"
 	}
+	if len(path) == 3 && path[0] == "packages" && path[2] == "packages" {
+		return fmt.Sprintf("Pacote (%s)", path[1])
+	}
 	parts := make([]string, len(path))
 	for index, part := range path {
 		if label, ok := statusPathParts[part]; ok {
@@ -195,6 +269,32 @@ func statusKind(path []string) string {
 		}
 	}
 	return strings.Join(parts, " · ")
+}
+
+func statusDetailEmpty(value any) bool {
+	if value == nil {
+		return true
+	}
+	text, ok := value.(string)
+	return ok && strings.TrimSpace(text) == ""
+}
+
+func statusDetailValue(key string, value any) string {
+	formatted := statusValue(value)
+	if key == "current_sha" && len(formatted) > 12 {
+		return formatted[:12]
+	}
+	return formatted
+}
+
+func equivalentRepositoryURL(left, right any) bool {
+	leftText, leftOK := left.(string)
+	rightText, rightOK := right.(string)
+	if !leftOK || !rightOK {
+		return false
+	}
+	normalize := func(value string) string { return strings.TrimSuffix(strings.TrimSpace(value), ".git") }
+	return normalize(leftText) == normalize(rightText)
 }
 
 func statusField(key string) string {
@@ -263,13 +363,14 @@ var statusRootOrder = []string{
 }
 
 var statusIdentityOrder = []string{
-	"target", "tool", "name", "package", "path", "id", "unit", "service",
+	"target", "tool", "name", "package", "path_raw", "path", "id", "unit", "service",
 	"repo", "user", "group", "shell", "key",
 }
 
 var statusDetailOrder = []string{
 	"source", "mode", "requested_version", "resolved_version", "version",
-	"installed", "enabled", "url", "ref",
+	"installed_version", "installed", "enabled", "url", "ref", "current_ref",
+	"current_sha", "current", "shell", "path", "origin", "reason",
 }
 
 var statusKinds = map[string]string{
@@ -311,10 +412,21 @@ var statusFields = map[string]string{
 	"requested_version": "Versão pedida",
 	"resolved_version":  "Versão resolvida",
 	"version":           "Versão",
+	"installed_version": "Versão instalada",
 	"installed":         "Instalado",
 	"enabled":           "Habilitado",
+	"available":         "Disponível",
 	"url":               "URL",
 	"ref":               "Referência",
+	"current_ref":       "Referência atual",
+	"current_sha":       "Commit atual",
+	"current":           "Atual",
+	"shell":             "Desejado",
+	"path":              "Caminho",
+	"origin":            "Origem atual",
+	"path_raw":          "Caminho declarado",
+	"reason":            "Motivo",
+	"shell_listed":      "Shell registrado",
 }
 
 var statusStates = map[string]string{
@@ -327,4 +439,6 @@ var statusStates = map[string]string{
 	"stopped":   "parado",
 	"enabled":   "habilitado",
 	"disabled":  "desabilitado",
+	"current":   "atual",
+	"set":       "configurado",
 }
