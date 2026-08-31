@@ -36,8 +36,17 @@ func (a *App) runProject(ctx context.Context, args []string) error {
 			fmt.Fprintln(a.options.Out, "Nenhum projeto cadastrado.")
 			return nil
 		}
+		trust := a.projectTrust()
 		for _, item := range projects {
-			fmt.Fprintf(a.options.Out, "%s\t%s\n", item.Name, item.Manifest.Path)
+			trusted, err := trust.IsTrusted(item.Path)
+			if err != nil {
+				return err
+			}
+			approval := "revisão necessária"
+			if trusted {
+				approval = "aprovado"
+			}
+			fmt.Fprintf(a.options.Out, "%s\t%s\t%s\n", item.Name, approval, item.Manifest.Path)
 		}
 		return nil
 	case "show":
@@ -243,13 +252,18 @@ func (a *App) runDev(ctx context.Context, args []string) error {
 	if !info.IsDir() {
 		return fmt.Errorf("a pasta do projeto não é um diretório: %s", projectDir)
 	}
-	if dryRun {
-		a.printProjectPlan(name, projectDir, manifest)
-		return nil
-	}
 	trusted, err := a.projectTrust().IsTrusted(manifestPath)
 	if err != nil {
 		return err
+	}
+	if dryRun {
+		a.printProjectPlan(name, projectDir, manifest)
+		if trusted {
+			fmt.Fprintln(a.options.Out, "Aprovação local: válida")
+		} else {
+			fmt.Fprintf(a.options.Out, "Aprovação local: pendente — revise e execute `konen project trust %s`\n", name)
+		}
+		return nil
 	}
 	if !trusted {
 		return fmt.Errorf("os comandos de %q ainda não foram aprovados ou mudaram; revise com `konen project show %s` e execute `konen project trust %s`", name, name, name)

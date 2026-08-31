@@ -189,6 +189,32 @@ func TestDiffUsesNativeMiseDiff(t *testing.T) {
 	}
 }
 
+func TestPlanUsesNativeMisePlan(t *testing.T) {
+	root := t.TempDir()
+	stateDir := filepath.Join(root, "state")
+	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
+	application := New(Options{
+		ConfigPath: filepath.Join(root, "config.toml"),
+		HomeDir:    root,
+		Out:        &bytes.Buffer{},
+		Err:        &bytes.Buffer{},
+		Runner:     runner,
+		Prompter:   unusedPrompter{},
+	})
+
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	if err := application.Run(context.Background(), []string{"plan"}); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{"-C", stateDir, "bootstrap", "plan"}
+	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1].args, want) {
+		t.Fatalf("mise args = %#v, want %#v", runner.runs, want)
+	}
+}
+
 func TestExistingStateNeedsExplicitTrust(t *testing.T) {
 	root := t.TempDir()
 	stateDir := filepath.Join(root, "state")
@@ -337,6 +363,45 @@ func TestDevOpensTabsInCurrentKittyAndFocusesFirst(t *testing.T) {
 	wantFocus := runCall{dir: projectDir, name: "/bin/kitten", args: []string{"@", "focus-tab", "--match", "window_id:41"}}
 	if !reflect.DeepEqual(runner.runs[3], wantFocus) {
 		t.Fatalf("focus = %#v, want %#v", runner.runs[3], wantFocus)
+	}
+}
+
+func TestDevDryRunShowsPendingApprovalWithoutLaunching(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	projectDir := filepath.Join(home, "project")
+	stateDir := filepath.Join(root, "state")
+	configPath := filepath.Join(root, "config", "config.toml")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise", "kitten": "/bin/kitten"}}
+	var out bytes.Buffer
+	application := New(Options{
+		ConfigPath: configPath, HomeDir: home, WorkDir: projectDir,
+		Out: &out, Err: &out, Runner: runner, Prompter: unusedPrompter{},
+		Getenv: func(string) string { return "4" },
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	store := project.Store{StateDir: stateDir, HomeDir: home}
+	if _, err := store.Save("sample", project.Manifest{
+		Version: 1, Path: projectDir, Tabs: []project.Tab{{Title: "Terminal"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	runner.runs = nil
+	out.Reset()
+
+	if err := application.Run(context.Background(), []string{"dev", "sample", "--dry-run"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "Aprovação local: pendente") {
+		t.Fatalf("dry-run output = %q", out.String())
+	}
+	if len(runner.runs) != 0 {
+		t.Fatalf("dry-run launched commands: %#v", runner.runs)
 	}
 }
 

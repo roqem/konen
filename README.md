@@ -52,6 +52,7 @@ konen init --git ~/home
 konen trust
 konen add ~/.zshrc
 konen status
+konen plan
 konen diff
 konen apply --dry-run
 konen apply
@@ -104,6 +105,10 @@ Konen stores only a pointer to that directory in
 as mise's global user config, so machine-wide tools remain available inside
 projects and project-local mise files can override them. Konen never commits or
 pushes on your behalf.
+
+`konen status` lists every package, tool, service, repository and managed file
+declared by the state. `konen plan` shows the exact pending changes before
+`konen apply`; Konen does not keep a second, hidden installation list.
 
 ## Development
 

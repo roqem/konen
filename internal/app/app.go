@@ -71,6 +71,8 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return a.runInit(ctx, args[1:])
 	case "status":
 		return a.runMise(ctx, []string{"bootstrap", "status"})
+	case "plan":
+		return a.runMise(ctx, []string{"bootstrap", "plan"})
 	case "diff":
 		return a.runMise(ctx, []string{"bootstrap", "dotfiles", "diff"})
 	case "apply":
@@ -376,7 +378,8 @@ Uso:
   konen                    abre o menu interativo
   konen init [--git] [DIR] configura ou cria o estado
   konen init --from URL [DIR]
-  konen status             mostra o estado da máquina
+  konen status             mostra tudo que o estado declara
+  konen plan               mostra exatamente o que mudaria
   konen diff               mostra diferenças dos dotfiles
   konen apply [--dry-run]  aplica o estado com mise
   konen add [--mode MODE] CAMINHO...

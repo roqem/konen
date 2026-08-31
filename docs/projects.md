@@ -63,7 +63,8 @@ have opened and the first has received focus; if it is the only terminal in its
 tab, Kitty closes that tab as well.
 
 Edit it through the guided form with `konen project edit NAME`. `show`, `list`
-and `--dry-run` are non-mutating inspection commands.
+and `--dry-run` are non-mutating inspection commands. The list and dry-run
+output also report whether each local approval is valid or needs review.
 
 ## Trust
 
@@ -78,3 +79,5 @@ konen project trust my-app
 ```
 
 Konen will not launch any tab until the current manifest has been approved.
+Moving the state repository changes each manifest's absolute identity and
+therefore requires a new local approval even when its contents are unchanged.

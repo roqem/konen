@@ -48,9 +48,10 @@ func NewHuhPrompter(in io.Reader, out io.Writer) HuhPrompter {
 func (p HuhPrompter) Menu(configured bool) (string, error) {
 	var action string
 	options := []huh.Option[string]{
+		huh.NewOption("Revisar o que mudaria", "plan"),
 		huh.NewOption("Preparar esta máquina", "apply"),
 		huh.NewOption("Abrir um projeto", "dev"),
-		huh.NewOption("Ver o estado", "status"),
+		huh.NewOption("Ver tudo configurado", "status"),
 		huh.NewOption("Adicionar um arquivo", "add"),
 		huh.NewOption("Confiar no estado após revisar", "trust"),
 		huh.NewOption("Diagnosticar problemas", "doctor"),
