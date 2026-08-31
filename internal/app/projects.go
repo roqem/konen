@@ -303,7 +303,7 @@ func (a *App) launchInCurrentKitty(ctx context.Context, name, dir string, manife
 		return errors.New("kitten não foi encontrado; instale o Kitty ou execute `konen dev --dry-run`")
 	}
 	if _, err := a.options.Runner.Output(ctx, dir, kitten, "@", "ls"); err != nil {
-		return fmt.Errorf("controle remoto do Kitty indisponível; habilite `allow_remote_control yes` no kitty.conf: %w", err)
+		return fmt.Errorf("controle remoto do Kitty indisponível; execute diretamente em uma aba do Kitty e confirme `allow_remote_control yes` no kitty.conf: %w", err)
 	}
 
 	shell := a.projectShell(manifest)
