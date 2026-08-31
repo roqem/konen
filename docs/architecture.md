@@ -40,6 +40,10 @@ repository. Kitty remains the execution and layout engine.
   editing to `mise config set`, disables tool auto-install for that operation
   and refreshes local trust only after confirmation. Installation remains a
   separate `plan`/`apply` decision.
+- Guided package and repository registration writes the corresponding native
+  mise tables without installing packages or cloning checkouts. It preserves
+  the rest of `mise.toml`, previews the exact diff, refuses to replace an
+  existing declaration and refreshes trust only after an atomic write.
 - Managed mise operations pin the selected state's `mise.toml` as the global
   config and configuration root, stop discovery at the state directory and
   accept only `mise.toml` there. This prevents a previously linked machine

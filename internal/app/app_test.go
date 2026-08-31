@@ -97,6 +97,12 @@ func (unusedPrompter) AddTarget() (string, error) { return "", errors.New("unexp
 func (unusedPrompter) Tool(ui.ToolAnswer) (ui.ToolAnswer, error) {
 	return ui.ToolAnswer{}, errors.New("unexpected prompt")
 }
+func (unusedPrompter) Package(ui.PackageAnswer) (ui.PackageAnswer, error) {
+	return ui.PackageAnswer{}, errors.New("unexpected prompt")
+}
+func (unusedPrompter) Repository(ui.RepositoryAnswer) (ui.RepositoryAnswer, error) {
+	return ui.RepositoryAnswer{}, errors.New("unexpected prompt")
+}
 func (unusedPrompter) ChooseApplyParts([]ui.ApplyPart) ([]string, error) {
 	return nil, errors.New("unexpected prompt")
 }

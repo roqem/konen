@@ -25,9 +25,9 @@ _.path = "{{ config_source | canonicalize | dirname }}/scripts/bin"
 [dotfiles]
 "~/.config/mise/config.toml" = { source = "mise.toml", mode = "symlink" }
 
-# Declare tools manually or with konen tool add; put packages, repositories and
-# managed files here. Put personal commands in scripts/bin and custom installer
-# tasks in mise-tasks/install.
+# Add tools, system packages, repositories and managed files with Konen or edit
+# this native mise file directly. Put personal commands in scripts/bin and
+# custom installer tasks in mise-tasks/install.
 # A [tasks.bootstrap] entry may run installers sequentially during apply.
 # ` + "`konen dotfile add ~/.zshrc`" + ` adds a dotfile without inventing a second format.
 `

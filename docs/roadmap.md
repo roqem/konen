@@ -36,15 +36,15 @@ Objetivo: permitir que alguém monte seu primeiro estado sem precisar conhecer
 TOML, mantendo o `mise.toml` resultante simples e totalmente editável.
 
 - [x] adicionar ferramentas pelo menu, com diff e confirmação;
-- [ ] adicionar pacotes do sistema e repositórios pelo menu;
-- explicar versão, plataforma e gerenciador antes de gravar;
-- reutilizar o fluxo existente para capturar dotfiles;
-- criar ou importar um comando pessoal em `scripts/bin`;
-- criar o esqueleto de um instalador e selecioná-lo no `bootstrap`, sem gerar
+- [x] adicionar pacotes do sistema e repositórios pelo menu;
+- [x] explicar versão, plataforma e gerenciador antes de gravar;
+- [x] reutilizar o fluxo existente para capturar dotfiles;
+- [ ] criar ou importar um comando pessoal em `scripts/bin`;
+- [ ] criar o esqueleto de um instalador e selecioná-lo no `bootstrap`, sem gerar
   comandos de instalação não revisados;
-- mostrar o diff do arquivo que será alterado;
-- atualizar a confiança após uma mutação feita pelo assistente;
-- orientar a criação do primeiro commit e avisar quando o estado ainda não tem
+- [x] mostrar o diff do arquivo que será alterado;
+- [x] atualizar a confiança após uma mutação feita pelo assistente;
+- [ ] orientar a criação do primeiro commit e avisar quando o estado ainda não tem
   remoto, sem fazer commit ou push automaticamente.
 
 Critério de conclusão: uma pessoa iniciante consegue adicionar uma ferramenta,

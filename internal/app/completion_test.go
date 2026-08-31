@@ -12,14 +12,14 @@ import (
 
 func TestCompletionScriptsCoverCommandsAndDynamicProjects(t *testing.T) {
 	common := []string{
-		"init", "status", "plan", "diff", "apply", "tool", "dotfile", "add", "projects", "project", "dev",
+		"init", "status", "plan", "diff", "apply", "tool", "package", "repo", "dotfile", "add", "projects", "project", "dev",
 		"trust", "doctor", "completion", "version", "help",
 		"edit", "list", "show", "__complete projects",
 	}
 	options := map[string][]string{
-		"zsh":  {"--git", "--from", "--yes", "--dry-run", "--select", "--only", "--mode"},
-		"bash": {"--git", "--from", "--yes", "--dry-run", "--select", "--only", "--mode"},
-		"fish": {"-l git", "-l from", "-l yes", "-l dry-run", "-l select", "-l only", "-l mode"},
+		"zsh":  {"--git", "--from", "--yes", "--dry-run", "--select", "--only", "--manager", "--mode"},
+		"bash": {"--git", "--from", "--yes", "--dry-run", "--select", "--only", "--manager", "--mode"},
+		"fish": {"-l git", "-l from", "-l yes", "-l dry-run", "-l select", "-l only", "-l manager", "-l mode"},
 	}
 	for _, shell := range []string{"zsh", "bash", "fish"} {
 		script, err := completionScript(shell)

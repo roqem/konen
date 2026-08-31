@@ -61,7 +61,7 @@ _konen_projects() {
 }
 
 _konen() {
-  local -a commands tool_actions dotfile_actions project_actions
+  local -a commands tool_actions package_actions repo_actions dotfile_actions project_actions
   commands=(
     'init:configura ou cria o estado'
     'status:mostra tudo que o estado declara'
@@ -69,6 +69,8 @@ _konen() {
     'diff:mostra diferenças dos dotfiles'
     'apply:aplica o estado com mise'
     'tool:gerencia ferramentas do estado'
+    'package:gerencia pacotes do sistema no estado'
+    'repo:gerencia repositórios Git no estado'
     'dotfile:gerencia arquivos de configuração'
     'projects:lista os projetos cadastrados'
     'project:gerencia projetos e suas sessões'
@@ -81,6 +83,12 @@ _konen() {
   )
   tool_actions=(
     'add:adiciona uma ferramenta ao estado'
+  )
+  package_actions=(
+    'add:adiciona um pacote do sistema ao estado'
+  )
+  repo_actions=(
+    'add:adiciona um repositório Git ao estado'
   )
   dotfile_actions=(
     'add:adiciona um dotfile ao estado'
@@ -147,6 +155,48 @@ _konen() {
         *) _describe 'ação' tool_actions ;;
       esac
       ;;
+    package)
+      if (( CURRENT == 2 )); then
+        _describe 'ação' package_actions
+        return
+      fi
+      local action=$words[2]
+      words=($words[2,-1])
+      (( CURRENT-- ))
+      case $action in
+        add)
+          _arguments \
+            '(-h --help)'{-h,--help}'[mostra ajuda]' \
+            '--yes[grava sem pedir confirmação]' \
+            '--dry-run[mostra a alteração sem gravar]' \
+            '--manager=[define o gerenciador do sistema]:gerenciador:(apt dnf pacman apk brew brew-cask flatpak flatpak-user mas)' \
+            '1:pacote' \
+            '2:versão'
+          ;;
+        *) _describe 'ação' package_actions ;;
+      esac
+      ;;
+    repo)
+      if (( CURRENT == 2 )); then
+        _describe 'ação' repo_actions
+        return
+      fi
+      local action=$words[2]
+      words=($words[2,-1])
+      (( CURRENT-- ))
+      case $action in
+        add)
+          _arguments \
+            '(-h --help)'{-h,--help}'[mostra ajuda]' \
+            '--yes[grava sem pedir confirmação]' \
+            '--dry-run[mostra a alteração sem gravar]' \
+            '1:pasta de destino:_directories' \
+            '2:URL Git:_urls' \
+            '3:branch, tag ou commit'
+          ;;
+        *) _describe 'ação' repo_actions ;;
+      esac
+      ;;
     dotfile)
       if (( CURRENT == 2 )); then
         _describe 'ação' dotfile_actions
@@ -206,7 +256,7 @@ const bashCompletion = `_konen_completion() {
   command="${COMP_WORDS[1]}"
 
   if [[ $COMP_CWORD -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W "init status plan diff apply tool dotfile projects project dev trust doctor completion version help $(konen __complete projects 2>/dev/null)" -- "$current") )
+    COMPREPLY=( $(compgen -W "init status plan diff apply tool package repo dotfile projects project dev trust doctor completion version help $(konen __complete projects 2>/dev/null)" -- "$current") )
     return
   fi
 
@@ -230,6 +280,26 @@ const bashCompletion = `_konen_completion() {
         COMPREPLY=( $(compgen -W 'add' -- "$current") )
       elif [[ $action == add && $current == -* ]]; then
         COMPREPLY=( $(compgen -W '--yes --dry-run -h --help' -- "$current") )
+      fi
+      ;;
+    package)
+      action="${COMP_WORDS[2]}"
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W 'add' -- "$current") )
+      elif [[ $action == add && $previous == --manager ]]; then
+        COMPREPLY=( $(compgen -W 'apt dnf pacman apk brew brew-cask flatpak flatpak-user mas' -- "$current") )
+      elif [[ $action == add && $current == -* ]]; then
+        COMPREPLY=( $(compgen -W '--manager --yes --dry-run -h --help' -- "$current") )
+      fi
+      ;;
+    repo)
+      action="${COMP_WORDS[2]}"
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W 'add' -- "$current") )
+      elif [[ $action == add && $current == -* ]]; then
+        COMPREPLY=( $(compgen -W '--yes --dry-run -h --help' -- "$current") )
+      elif [[ $action == add && $COMP_CWORD -eq 3 ]]; then
+        COMPREPLY=( $(compgen -d -- "$current") )
       fi
       ;;
     dotfile)
@@ -276,6 +346,8 @@ complete -c konen -n '__fish_use_subcommand' -a plan -d 'Mostra exatamente o que
 complete -c konen -n '__fish_use_subcommand' -a diff -d 'Mostra diferenças dos dotfiles'
 complete -c konen -n '__fish_use_subcommand' -a apply -d 'Aplica o estado com mise'
 complete -c konen -n '__fish_use_subcommand' -a tool -d 'Gerencia ferramentas do estado'
+complete -c konen -n '__fish_use_subcommand' -a package -d 'Gerencia pacotes do sistema no estado'
+complete -c konen -n '__fish_use_subcommand' -a repo -d 'Gerencia repositórios Git no estado'
 complete -c konen -n '__fish_use_subcommand' -a dotfile -d 'Gerencia arquivos de configuração'
 complete -c konen -n '__fish_use_subcommand' -a projects -d 'Lista os projetos cadastrados'
 complete -c konen -n '__fish_use_subcommand' -a project -d 'Gerencia projetos e suas sessões'
@@ -295,6 +367,13 @@ complete -c konen -n '__fish_seen_subcommand_from plan apply' -l only -r -a 'pac
 complete -c konen -n '__fish_seen_subcommand_from tool' -a add -d 'Adiciona uma ferramenta ao estado'
 complete -c konen -n '__fish_seen_subcommand_from tool' -l yes -d 'Grava sem pedir confirmação'
 complete -c konen -n '__fish_seen_subcommand_from tool' -l dry-run -d 'Mostra a alteração sem gravar'
+complete -c konen -n '__fish_seen_subcommand_from package' -a add -d 'Adiciona um pacote do sistema ao estado'
+complete -c konen -n '__fish_seen_subcommand_from package' -l manager -r -a 'apt dnf pacman apk brew brew-cask flatpak flatpak-user mas' -d 'Gerenciador do sistema'
+complete -c konen -n '__fish_seen_subcommand_from package' -l yes -d 'Grava sem pedir confirmação'
+complete -c konen -n '__fish_seen_subcommand_from package' -l dry-run -d 'Mostra a alteração sem gravar'
+complete -c konen -n '__fish_seen_subcommand_from repo' -a add -d 'Adiciona um repositório Git ao estado'
+complete -c konen -n '__fish_seen_subcommand_from repo' -l yes -d 'Grava sem pedir confirmação'
+complete -c konen -n '__fish_seen_subcommand_from repo' -l dry-run -d 'Mostra a alteração sem gravar'
 complete -c konen -n '__fish_seen_subcommand_from dotfile' -a add -d 'Adiciona um dotfile ao estado'
 complete -c konen -n '__fish_seen_subcommand_from dotfile' -l mode -r -a 'symlink copy template' -d 'Modo do dotfile'
 complete -c konen -n '__fish_seen_subcommand_from dev' -l dry-run -d 'Mostra a sessão sem abrir abas'

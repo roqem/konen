@@ -87,6 +87,10 @@ func (a *App) run(ctx context.Context, args []string) error {
 		return a.runApply(ctx, args[1:])
 	case "tool":
 		return a.runTool(ctx, args[1:])
+	case "package":
+		return a.runPackage(ctx, args[1:])
+	case "repo":
+		return a.runRepo(ctx, args[1:])
 	case "dotfile":
 		return a.runDotfile(ctx, args[1:])
 	case "add":
@@ -110,6 +114,10 @@ func (a *App) run(ctx context.Context, args []string) error {
 		return a.runDotfile(ctx, []string{"add"})
 	case "__tool_add":
 		return a.runTool(ctx, []string{"add"})
+	case "__package_add":
+		return a.runPackage(ctx, []string{"add"})
+	case "__repo_add":
+		return a.runRepo(ctx, []string{"add"})
 	case "__plan_select":
 		return a.runApply(ctx, []string{"--dry-run", "--select"})
 	case "__apply_select":
@@ -576,6 +584,10 @@ func (a *App) printHelp() {
 	a.printCommandGroup("Estado", [][2]string{
 		{"konen tool add [NOME] [VERSÃO]", "adiciona uma ferramenta pelo assistente"},
 		{"konen tool add --dry-run NOME [VERSÃO]", "mostra a alteração sem gravar"},
+		{"konen package add [--manager M] PACOTE [VERSÃO]", "adiciona um pacote do sistema"},
+		{"konen package add --dry-run [--manager M] PACOTE [VERSÃO]", "mostra a alteração sem gravar"},
+		{"konen repo add DESTINO URL [REF]", "adiciona um repositório Git"},
+		{"konen repo add --dry-run DESTINO URL [REF]", "mostra a alteração sem gravar"},
 		{"konen dotfile add CAMINHO...", "adiciona dotfiles ao estado"},
 		{"konen dotfile add --mode MODO CAMINHO...", "usa symlink, copy ou template"},
 		{"konen diff", "mostra diferenças dos dotfiles"},

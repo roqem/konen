@@ -34,6 +34,18 @@ type ToolAnswer struct {
 	Version string
 }
 
+type PackageAnswer struct {
+	Manager string
+	Name    string
+	Version string
+}
+
+type RepositoryAnswer struct {
+	Destination string
+	URL         string
+	Ref         string
+}
+
 type ApplyPart struct {
 	Key         string
 	Label       string
@@ -45,6 +57,8 @@ type Prompter interface {
 	Init(defaultPath string) (InitAnswer, error)
 	AddTarget() (string, error)
 	Tool(ToolAnswer) (ToolAnswer, error)
+	Package(PackageAnswer) (PackageAnswer, error)
+	Repository(RepositoryAnswer) (RepositoryAnswer, error)
 	ChooseApplyParts([]ApplyPart) ([]string, error)
 	Confirm(string) (bool, error)
 	Project(ProjectAnswer) (ProjectAnswer, error)
@@ -86,6 +100,8 @@ func (p HuhPrompter) Menu(configured bool) (string, error) {
 		huh.NewOption(CommandLabel("dev", "abrir um projeto", 13), "dev"),
 		huh.NewOption(CommandLabel("status", "ver tudo configurado", 13), "status"),
 		huh.NewOption(CommandLabel("tool add", "adicionar uma ferramenta", 13), "__tool_add"),
+		huh.NewOption(CommandLabel("package add", "adicionar um pacote do sistema", 13), "__package_add"),
+		huh.NewOption(CommandLabel("repo add", "adicionar um repositório Git", 13), "__repo_add"),
 		huh.NewOption(CommandLabel("dotfile add", "adicionar um arquivo de configuração", 13), "__dotfile_add"),
 		huh.NewOption(CommandLabel("trust", "confiar no estado após revisar", 13), "trust"),
 		huh.NewOption(CommandLabel("doctor", "diagnosticar problemas", 13), "doctor"),
@@ -176,6 +192,65 @@ func (p HuhPrompter) Tool(answer ToolAnswer) (ToolAnswer, error) {
 	return answer, nil
 }
 
+func (p HuhPrompter) Package(answer PackageAnswer) (PackageAnswer, error) {
+	form := huh.NewForm(huh.NewGroup(
+		huh.NewSelect[string]().
+			Title("Gerenciador do pacote").
+			Description("Escolha quem instala e verifica este pacote.").
+			Options(
+				huh.NewOption("apt — Debian e Ubuntu", "apt"),
+				huh.NewOption("dnf — Fedora e derivados", "dnf"),
+				huh.NewOption("pacman — Arch e derivados", "pacman"),
+				huh.NewOption("apk — Alpine Linux", "apk"),
+				huh.NewOption("brew — macOS ou Linux", "brew"),
+				huh.NewOption("brew-cask — aplicativos e fontes", "brew-cask"),
+				huh.NewOption("flatpak — instalação do sistema", "flatpak"),
+				huh.NewOption("flatpak-user — instalação do usuário", "flatpak-user"),
+				huh.NewOption("mas — Mac App Store", "mas"),
+			).
+			Value(&answer.Manager),
+		huh.NewInput().
+			Title("Nome do pacote").
+			Description("Exemplos: jq, google-chrome-stable ou org.mozilla.firefox.").
+			Value(&answer.Name),
+		huh.NewInput().
+			Title("Versão").
+			Description("Use latest ou a versão nativa do gerenciador.").
+			Value(&answer.Version),
+	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
+	if err := form.Run(); err != nil {
+		return PackageAnswer{}, err
+	}
+	answer.Manager = strings.TrimSpace(answer.Manager)
+	answer.Name = strings.TrimSpace(answer.Name)
+	answer.Version = strings.TrimSpace(answer.Version)
+	return answer, nil
+}
+
+func (p HuhPrompter) Repository(answer RepositoryAnswer) (RepositoryAnswer, error) {
+	form := huh.NewForm(huh.NewGroup(
+		huh.NewInput().
+			Title("Pasta de destino").
+			Description("Use um caminho portátil como ~/Projects/example.").
+			Value(&answer.Destination),
+		huh.NewInput().
+			Title("URL Git").
+			Description("HTTPS ou SSH, como https://github.com/org/repo.git.").
+			Value(&answer.URL),
+		huh.NewInput().
+			Title("Branch, tag ou commit (opcional)").
+			Description("Sem referência, apply não atualiza um checkout existente.").
+			Value(&answer.Ref),
+	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
+	if err := form.Run(); err != nil {
+		return RepositoryAnswer{}, err
+	}
+	answer.Destination = strings.TrimSpace(answer.Destination)
+	answer.URL = strings.TrimSpace(answer.URL)
+	answer.Ref = strings.TrimSpace(answer.Ref)
+	return answer, nil
+}
+
 func (p HuhPrompter) ChooseApplyParts(parts []ApplyPart) ([]string, error) {
 	selected := make([]string, 0, len(parts))
 	options := make([]huh.Option[string], 0, len(parts))
@@ -185,14 +260,24 @@ func (p HuhPrompter) ChooseApplyParts(parts []ApplyPart) ([]string, error) {
 			CommandLabel(part.Label, part.Description, 20), part.Key,
 		).Selected(true))
 	}
-	form := huh.NewForm(huh.NewGroup(
-		huh.NewMultiSelect[string]().
-			Title("Quais etapas deseja considerar?").
-			Description("Espaço marca ou desmarca; Enter continua.").
-			Options(options...).
-			Value(&selected),
-	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
+	field := applyPartsField(options, &selected)
+	form := huh.NewForm(huh.NewGroup(field)).
+		WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
 	return selected, form.Run()
+}
+
+func applyPartsField(options []huh.Option[string], selected *[]string) *huh.MultiSelect[string] {
+	// Huh's automatic MultiSelect height counts only the options and then
+	// subtracts the title and description, leaving a zero-height viewport for
+	// short lists. Set the complete field height explicitly so even one option
+	// remains visible in the regular terminal renderer.
+	return huh.NewMultiSelect[string]().
+		Title("Quais etapas deseja considerar?").
+		Description("Espaço marca ou desmarca; Enter continua.").
+		Options(options...).
+		Value(selected).
+		Filterable(false).
+		Height(len(options) + 2)
 }
 
 func (p HuhPrompter) Confirm(title string) (bool, error) {

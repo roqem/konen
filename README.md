@@ -35,7 +35,7 @@ selecionadas automaticamente:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.8 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.9 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -254,23 +254,50 @@ em pastas ancestrais não são misturados ao plano.
 ### Pacotes do sistema
 
 Bibliotecas de compilação e programas fornecidos pela distribuição pertencem a
-`[bootstrap.packages]`:
+[`[bootstrap.packages]`](https://mise.jdx.dev/bootstrap/packages/). O assistente
+detecta o gerenciador mais provável, explica em qual plataforma ele é usado e
+mostra o diff antes de gravar:
+
+```console
+konen package add
+konen package add --dry-run --manager apt jq latest
+konen package add --manager apt jq latest
+```
+
+O cadastro não instala nada. Depois de gravar, revise apenas essa etapa com
+`konen plan --only packages`; a instalação acontece somente num `apply` que
+inclua pacotes. Em automações, `--yes` confirma apenas a edição do estado.
+
+O resultado continua sendo configuração nativa do mise:
 
 ```toml
 [bootstrap.packages]
-"apt:build-essential" = { os = "linux" }
-"apt:libssl-dev" = { os = "linux" }
-"apt:zsh" = { os = "linux" }
+"apt:build-essential" = "latest"
+"apt:libssl-dev" = "latest"
+"apt:zsh" = "latest"
 ```
 
-O prefixo informa o gerenciador (`apt`, `dnf`, `pacman`, `brew` etc.). Esse é o
-momento em que mise pode chamar `sudo`, sempre depois de a operação aparecer no
+O prefixo informa o gerenciador (`apt`, `dnf`, `pacman`, `brew`, `flatpak`
+etc.); o valor informa a versão pedida. Mise pode chamar `sudo` durante a
+aplicação de alguns gerenciadores, sempre depois de a operação aparecer no
 plano.
 
 ### Repositórios auxiliares
 
-Use `[bootstrap.repos]` para checkouts que fazem parte do ambiente, mas não são
-seus projetos de trabalho:
+Use [`[bootstrap.repos]`](https://mise.jdx.dev/bootstrap/repos.html) para
+checkouts que fazem parte do ambiente, mas não são seus projetos de trabalho. O
+caminho deve ser absoluto ou começar com `~/`:
+
+```console
+konen repo add
+konen repo add --dry-run ~/.oh-my-zsh https://github.com/ohmyzsh/ohmyzsh.git
+konen repo add ~/.oh-my-zsh https://github.com/ohmyzsh/ohmyzsh.git
+```
+
+Assim como os outros assistentes, o comando mostra o diff e não clona nada.
+Use `konen plan --only repos` para revisar o clone antes do `apply`. Informar
+uma branch, tag ou commit torna a referência desejada explícita; sem `REF`, um
+checkout que já existe não é atualizado automaticamente.
 
 ```toml
 [bootstrap.repos]
@@ -483,6 +510,8 @@ aprovação local separada; uma edição ou pull exige
 | `konen apply --yes` | Aplica sem perguntas; use somente depois de revisar o plano. |
 | `konen trust` | Aprova localmente o estado executável que você revisou. |
 | `konen tool add [NOME] [VERSÃO]` | Adiciona uma ferramenta ao estado mostrando o diff. |
+| `konen package add [--manager M] PACOTE [VERSÃO]` | Adiciona um pacote do sistema sem instalá-lo. |
+| `konen repo add DESTINO URL [REF]` | Adiciona um checkout Git sem cloná-lo. |
 | `konen dotfile add CAMINHO` | Passa a gerenciar uma configuração existente. |
 | `konen project add [DIR]` | Cadastra um projeto e suas abas. |
 | `konen projects` | Lista projetos e a situação da aprovação. |
