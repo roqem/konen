@@ -42,6 +42,25 @@ sh install.sh
 See [docs/distribution.md](docs/distribution.md) for version pinning, mirrors,
 artifact attestations and the trust model.
 
+### Shell completion
+
+Konen generates completion for every command, option, path and dynamic project
+name. Add the line for your shell to its startup file:
+
+```zsh
+eval "$(konen completion zsh)"
+```
+
+```bash
+eval "$(konen completion bash)"
+```
+
+Fish can load the generated script from its standard completion directory:
+
+```fish
+konen completion fish > ~/.config/fish/completions/konen.fish
+```
+
 ## Commands
 
 Running `konen` opens an interactive menu. The same operations remain available

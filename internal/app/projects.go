@@ -37,6 +37,7 @@ func (a *App) runProject(ctx context.Context, args []string) error {
 			return nil
 		}
 		trust := a.projectTrust()
+		rows := make([][]string, 0, len(projects))
 		for _, item := range projects {
 			trusted, err := trust.IsTrusted(item.Path)
 			if err != nil {
@@ -46,8 +47,9 @@ func (a *App) runProject(ctx context.Context, args []string) error {
 			if trusted {
 				approval = "aprovado"
 			}
-			fmt.Fprintf(a.options.Out, "%s\t%s\t%s\n", item.Name, approval, item.Manifest.Path)
+			rows = append(rows, []string{item.Name, approval, item.Manifest.Path})
 		}
+		fmt.Fprint(a.options.Out, ui.RenderTable([]string{"PROJETO", "APROVAÇÃO", "PASTA"}, rows))
 		return nil
 	case "show":
 		if len(args) != 2 {
@@ -426,17 +428,19 @@ func (a *App) printProjectPlan(name, dir string, manifest project.Manifest) {
 		}
 		fmt.Fprintf(a.options.Out, "Aba invocadora: %s\n", invokingTab)
 	}
-	for index, tab := range manifest.Tabs {
+	rows := make([][]string, 0, len(manifest.Tabs))
+	for _, tab := range manifest.Tabs {
 		command := tab.Command
 		if command == "" {
 			command = "<shell>"
 		}
-		hold := ""
+		afterExit := "fechar"
 		if tab.Hold {
-			hold = " [hold]"
+			afterExit = "manter"
 		}
-		fmt.Fprintf(a.options.Out, "  %d. %s: %s%s\n", index+1, tab.Title, command, hold)
+		rows = append(rows, []string{tab.Title, command, afterExit})
 	}
+	fmt.Fprint(a.options.Out, ui.RenderTable([]string{"ABA", "COMANDO", "APÓS SAIR"}, rows))
 }
 
 func renderKittySession(dir, shell string, manifest project.Manifest) string {

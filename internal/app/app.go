@@ -87,6 +87,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return a.runDev(ctx, args[1:])
 	case "project":
 		return a.runProject(ctx, args[1:])
+	case "completion":
+		return a.runCompletion(args[1:])
+	case "__complete":
+		return a.runInternalComplete(args[1:])
 	case "version", "--version", "-v":
 		fmt.Fprintln(a.options.Out, a.options.Version)
 		return nil
@@ -392,6 +396,7 @@ Uso:
   konen dev [NOME] --dry-run
   konen trust              confia no mise.toml após revisão
   konen doctor             diagnostica a instalação
+  konen completion SHELL   gera autocomplete para zsh, bash ou fish
   konen version
 `)
 }

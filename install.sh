@@ -199,3 +199,9 @@ case ":${PATH:-}:" in
     say "Adicione $install_dir ao PATH ou execute: $install_dir/konen"
     ;;
 esac
+
+case "${SHELL:-}" in
+  */zsh) say 'Autocomplete: adicione `eval "$(konen completion zsh)"` ao ~/.zshrc.' ;;
+  */bash) say 'Autocomplete: adicione `eval "$(konen completion bash)"` ao ~/.bashrc.' ;;
+  */fish) say 'Autocomplete: execute `konen completion fish > ~/.config/fish/completions/konen.fish`.' ;;
+esac
