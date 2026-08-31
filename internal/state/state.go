@@ -30,6 +30,11 @@ const defaultGitignore = `.env
 *.key
 *.pem
 secrets/
+home/.git-credentials
+home/.config/gh/hosts.yml
+home/.netrc
+home/.ssh/id_*
+!home/.ssh/id_*.pub
 `
 
 type Service struct {
@@ -89,14 +94,35 @@ func (s Service) PrepareLocal(ctx context.Context, path string, initializeGit bo
 }
 
 func (s Service) Clone(ctx context.Context, remote, path string) error {
-	return s.clone(ctx, remote, path, nil)
+	return s.clone(ctx, remote, path, nil, nil)
 }
 
 func (s Service) CloneWithoutPrompt(ctx context.Context, remote, path string) error {
-	return s.clone(ctx, remote, path, []string{"GIT_TERMINAL_PROMPT=0"})
+	return s.clone(ctx, remote, path, []string{"GIT_TERMINAL_PROMPT=0"}, nil)
 }
 
-func (s Service) clone(ctx context.Context, remote, path string, environment []string) error {
+func (s Service) CloneWithCredentialHelper(ctx context.Context, remote, path, credentialURL, helper string) error {
+	if strings.TrimSpace(credentialURL) == "" {
+		return errors.New("o contexto do credential helper não pode ser vazio")
+	}
+	if strings.TrimSpace(helper) == "" {
+		return errors.New("o credential helper não pode ser vazio")
+	}
+	key := "credential." + credentialURL + ".helper"
+	gitOptions := []string{"-c", key + "=", "-c", key + "=" + helper}
+	if err := s.clone(ctx, remote, path, []string{"GIT_TERMINAL_PROMPT=0"}, gitOptions); err != nil {
+		return err
+	}
+	if err := s.Runner.Run(ctx, path, "git", "config", "--local", "--replace-all", key, ""); err != nil {
+		return fmt.Errorf("git config: não foi possível isolar os helpers anteriores: %w", err)
+	}
+	if err := s.Runner.Run(ctx, path, "git", "config", "--local", "--add", key, helper); err != nil {
+		return fmt.Errorf("git config: não foi possível registrar o helper local: %w", err)
+	}
+	return nil
+}
+
+func (s Service) clone(ctx context.Context, remote, path string, environment, gitOptions []string) error {
 	if remote == "" {
 		return errors.New("a origem Git não pode ser vazia")
 	}
@@ -115,11 +141,12 @@ func (s Service) clone(ctx context.Context, remote, path string, environment []s
 		return err
 	}
 
+	cloneArgs := append(append([]string(nil), gitOptions...), "clone", "--", remote, path)
 	var cloneErr error
 	if len(environment) == 0 {
-		cloneErr = s.Runner.Run(ctx, "", "git", "clone", "--", remote, path)
+		cloneErr = s.Runner.Run(ctx, "", "git", cloneArgs...)
 	} else {
-		cloneErr = s.Runner.RunEnv(ctx, "", environment, "git", "clone", "--", remote, path)
+		cloneErr = s.Runner.RunEnv(ctx, "", environment, "git", cloneArgs...)
 	}
 	if cloneErr != nil {
 		return fmt.Errorf("git clone: %w", cloneErr)

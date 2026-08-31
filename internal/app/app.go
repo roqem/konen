@@ -262,6 +262,9 @@ func (a *App) runDotfileAdd(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
+		if err := a.validateDotfileTarget(resolved); err != nil {
+			return err
+		}
 		targets[index] = resolved
 	}
 
@@ -278,6 +281,25 @@ func (a *App) runDotfileAdd(ctx context.Context, args []string) error {
 	}
 	miseArgs = append(miseArgs, targets...)
 	return a.runMise(ctx, miseArgs)
+}
+
+func (a *App) validateDotfileTarget(target string) error {
+	relative, err := filepath.Rel(filepath.Clean(a.options.HomeDir), filepath.Clean(target))
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return nil
+	}
+	portable := filepath.ToSlash(relative)
+	switch portable {
+	case ".gitconfig":
+		return errors.New("capturar ~/.gitconfig inteiro pode versionar credential helpers e caminhos desta máquina; mantenha preferências portáveis em ~/.config/git/config")
+	case ".git-credentials", ".config/gh", ".config/gh/hosts.yml", ".netrc", ".ssh":
+		return fmt.Errorf("%s contém credenciais e não pode ser capturado pelo Konen", target)
+	default:
+		if strings.HasPrefix(portable, ".ssh/id_") && !strings.HasSuffix(portable, ".pub") {
+			return fmt.Errorf("%s parece ser uma chave SSH privada e não pode ser capturado pelo Konen", target)
+		}
+		return nil
+	}
 }
 
 func (a *App) resolveDotfileTarget(target string) (string, error) {

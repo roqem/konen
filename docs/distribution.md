@@ -50,7 +50,9 @@ For a private `github:OWNER/REPO` state, the later interactive `konen init`
 step may use mise to download an ad-hoc GitHub CLI tool. Mise may cache that
 tool, but it is not silently added to the user's declared machine state. Konen
 explains the action before starting device-code authentication and never
-receives or stores the resulting token itself.
+receives or stores the resulting token itself. Git invokes the CLI as a
+command-scoped credential helper for the private clone; the persistent helper
+entry is local to that repository, and global Git configuration is untouched.
 
 ## Later packaging
 

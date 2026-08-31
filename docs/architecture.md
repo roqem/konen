@@ -75,9 +75,11 @@ or a browser on the new machine. The intended journey is deliberately split:
 1. the public installer places Konen and mise in the user's home without sudo;
 2. Konen installs or locates the minimal public prerequisites, including Git
    and GitHub CLI when the selected remote needs them;
-3. GitHub CLI performs a device-code login and configures Git over HTTPS;
-4. Konen clones the private state, requires explicit review and trust, and only
-then delegates the declared machine plan to mise.
+3. GitHub CLI performs a device-code login and serves credentials directly to
+   one HTTPS clone without changing global Git configuration;
+4. Konen stores the helper command only in the clone's local `.git/config`,
+   requires explicit review and trust, and only then delegates the declared
+   machine plan to mise.
 
 An existing GitHub login is not accepted merely because it is valid: Konen
 checks that the active account can read the requested repository. If another
@@ -93,6 +95,12 @@ are never copied into state.
 The public phase is a fixed capability bootstrap, not a hidden personal package
 list. Chrome, editors, Docker and other workstation choices remain visible in
 the user's mise state and in `konen plan`.
+
+Portable Git preferences belong in `~/.config/git/config`, which Git reads as a
+global user file alongside `~/.gitconfig`. The latter remains machine-owned so
+credential tools can write local executable paths without those paths entering
+versioned state. Konen refuses direct capture of whole `.gitconfig`, GitHub CLI
+auth storage, plaintext Git credentials, `.netrc` and SSH private keys.
 
 ## Extensions
 

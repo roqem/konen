@@ -3,11 +3,15 @@ package state
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/roqem/konen/internal/execx"
 )
 
 type fakeRunner struct {
@@ -55,6 +59,15 @@ func TestPrepareLocalCreatesPortableState(t *testing.T) {
 	if !strings.Contains(string(data), `"~/.config/mise/config.toml" = { source = "mise.toml", mode = "symlink" }`) {
 		t.Fatalf("mise.toml does not expose machine tools through the global mise config:\n%s", data)
 	}
+	ignore, err := os.ReadFile(filepath.Join(path, ".gitignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, protected := range []string{"home/.git-credentials", "home/.config/gh/hosts.yml", "home/.netrc", "home/.ssh/id_*"} {
+		if !strings.Contains(string(ignore), protected) {
+			t.Errorf("default .gitignore does not protect %s:\n%s", protected, ignore)
+		}
+	}
 	if _, err := os.Stat(filepath.Join(path, "home", ".gitkeep")); err != nil {
 		t.Fatalf("home directory was not initialized: %v", err)
 	}
@@ -97,6 +110,79 @@ func TestCloneWithoutPromptDisablesGitTerminalPrompts(t *testing.T) {
 	}
 	if !reflect.DeepEqual(runner.environment, []string{"GIT_TERMINAL_PROMPT=0"}) {
 		t.Fatalf("clone environment = %#v", runner.environment)
+	}
+}
+
+func TestCloneWithCredentialHelperScopesAuthenticationToCloneAndRepository(t *testing.T) {
+	runner := &environmentRunner{}
+	path := filepath.Join(t.TempDir(), "state")
+	service := Service{Runner: runner}
+	helper := "!'/opt/mise' 'exec' '--raw' 'gh@latest' '--' 'gh' 'auth' 'git-credential'"
+
+	if err := service.CloneWithCredentialHelper(context.Background(), "https://github.com/example/state.git", path, "https://github.com", helper); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(runner.environment, []string{"GIT_TERMINAL_PROMPT=0"}) {
+		t.Fatalf("clone environment = %#v", runner.environment)
+	}
+	want := [][]string{
+		{"", "git", "-c", "credential.https://github.com.helper=", "-c", "credential.https://github.com.helper=" + helper, "clone", "--", "https://github.com/example/state.git", path},
+		{path, "git", "config", "--local", "--replace-all", "credential.https://github.com.helper", ""},
+		{path, "git", "config", "--local", "--add", "credential.https://github.com.helper", helper},
+	}
+	if !reflect.DeepEqual(runner.runs, want) {
+		t.Fatalf("authenticated clone calls = %#v, want %#v", runner.runs, want)
+	}
+}
+
+func TestCloneWithCredentialHelperUsingRealGitDoesNotChangeGlobalConfig(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	source := filepath.Join(root, "source")
+	destination := filepath.Join(root, "state")
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	runner := execx.OSRunner{In: strings.NewReader(""), Out: io.Discard, Err: io.Discard}
+	ctx := context.Background()
+	if err := os.MkdirAll(source, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := runner.Run(ctx, source, "git", "init", "--initial-branch=main"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "mise.toml"), []byte("[tools]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range [][]string{
+		{"add", "mise.toml"},
+		{"-c", "user.name=Konen Test", "-c", "user.email=konen@example.invalid", "commit", "-m", "fixture"},
+	} {
+		if err := runner.Run(ctx, source, "git", command...); err != nil {
+			t.Fatalf("git %v: %v", command, err)
+		}
+	}
+
+	helper := "!'/opt/gh' 'auth' 'git-credential'"
+	service := Service{Runner: runner}
+	if err := service.CloneWithCredentialHelper(ctx, source, destination, "https://github.com", helper); err != nil {
+		t.Fatal(err)
+	}
+	output, err := runner.Output(ctx, destination, "git", "config", "--local", "--get-all", "credential.https://github.com.helper")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output != "\n"+helper+"\n" {
+		t.Fatalf("local helpers = %q", output)
+	}
+	for _, path := range []string{filepath.Join(home, ".gitconfig"), filepath.Join(home, ".config", "git", "config")} {
+		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("global Git config was changed at %s: %v", path, err)
+		}
 	}
 }
 

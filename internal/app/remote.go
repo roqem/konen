@@ -38,19 +38,21 @@ func (a *App) cloneRemoteState(ctx context.Context, input, destination string) e
 	}
 
 	fmt.Fprintln(a.options.Out, "O clone HTTPS falhou. O Konen tentará autenticar no GitHub sem criar uma chave SSH.")
-	if err := a.authenticateGitHub(ctx, source.githubRepository); err != nil {
+	command, err := a.authenticateGitHub(ctx, source.githubRepository)
+	if err != nil {
 		return fmt.Errorf("clone inicial: %v; autenticação no GitHub: %w", cloneErr, err)
 	}
-	if err := clone(ctx, source.cloneURL, destination); err != nil {
+	fmt.Fprintln(a.options.Out, "Refazendo o clone com um credential helper restrito a este repositório; a configuração Git global não será alterada.")
+	if err := a.state.CloneWithCredentialHelper(ctx, source.cloneURL, destination, "https://github.com", command.credentialHelper()); err != nil {
 		return fmt.Errorf("clone após autenticação no GitHub: %w", err)
 	}
 	return nil
 }
 
-func (a *App) authenticateGitHub(ctx context.Context, repository string) error {
+func (a *App) authenticateGitHub(ctx context.Context, repository string) (githubCommand, error) {
 	command, err := a.githubCLI()
 	if err != nil {
-		return err
+		return githubCommand{}, err
 	}
 	run := func(args ...string) error {
 		fullArgs := append(append([]string(nil), command.prefix...), args...)
@@ -71,22 +73,27 @@ func (a *App) authenticateGitHub(ctx context.Context, repository string) error {
 			if err := run("auth", "switch", "--hostname", "github.com"); err != nil {
 				fmt.Fprintln(a.options.Out, "Nenhuma outra conta autenticada resolveu o acesso; será iniciado um novo login.")
 				if err := a.loginGitHub(run); err != nil {
-					return err
+					return githubCommand{}, err
 				}
 			}
 		} else if err := a.loginGitHub(run); err != nil {
-			return err
+			return githubCommand{}, err
 		}
 		if !canAccessRepository() {
-			return fmt.Errorf("a conta ativa do GitHub ainda não pode acessar %s; confirme o proprietário, o nome e as permissões do repositório", repository)
+			return githubCommand{}, fmt.Errorf("a conta ativa do GitHub ainda não pode acessar %s; confirme o proprietário, o nome e as permissões do repositório", repository)
 		}
 	}
+	return command, nil
+}
 
-	fmt.Fprintln(a.options.Out, "Configurando o Git para usar as credenciais HTTPS da conta ativa no GitHub CLI.")
-	if err := run("auth", "setup-git", "--hostname", "github.com"); err != nil {
-		return fmt.Errorf("gh auth setup-git: %w", err)
+func (c githubCommand) credentialHelper() string {
+	arguments := append([]string{c.name}, c.prefix...)
+	arguments = append(arguments, "auth", "git-credential")
+	quoted := make([]string, len(arguments))
+	for index, argument := range arguments {
+		quoted[index] = shellQuote(argument)
 	}
-	return nil
+	return "!" + strings.Join(quoted, " ")
 }
 
 func (a *App) loginGitHub(run func(...string) error) error {

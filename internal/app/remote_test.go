@@ -55,7 +55,7 @@ func TestInitRetriesPrivateGitHubCloneWithMiseProvidedCLI(t *testing.T) {
 	authenticated := false
 	runner := &fakeRunner{paths: map[string]string{"git": "/usr/bin/git", "mise": "/bin/mise"}}
 	runner.runHook = func(call runCall) error {
-		if call.name == "git" && len(call.args) > 0 && call.args[0] == "clone" {
+		if call.name == "git" && containsArgs(call.args, "clone", "--") {
 			cloneAttempts++
 			if cloneAttempts == 1 {
 				return errors.New("authentication required")
@@ -95,7 +95,7 @@ func TestInitRetriesPrivateGitHubCloneWithMiseProvidedCLI(t *testing.T) {
 		t.Fatalf("clone attempts = %d, want 2", cloneAttempts)
 	}
 	for _, call := range runner.runs {
-		if call.name == "git" && !reflect.DeepEqual(call.environment, []string{"GIT_TERMINAL_PROMPT=0"}) {
+		if call.name == "git" && containsArgs(call.args, "clone", "--") && !reflect.DeepEqual(call.environment, []string{"GIT_TERMINAL_PROMPT=0"}) {
 			t.Fatalf("assisted clone environment = %#v", call.environment)
 		}
 	}
@@ -110,7 +110,7 @@ func TestInitRetriesPrivateGitHubCloneWithMiseProvidedCLI(t *testing.T) {
 		"sem criar uma chave SSH",
 		"mise baixará gh@latest sem sudo",
 		"navegador pode estar em outro dispositivo",
-		"credenciais HTTPS da conta ativa",
+		"configuração Git global não será alterada",
 		"Revise o mise.toml",
 	} {
 		if !strings.Contains(out.String(), fragment) {
@@ -123,7 +123,6 @@ func TestInitRetriesPrivateGitHubCloneWithMiseProvidedCLI(t *testing.T) {
 		{"exec", "--yes", "--raw", "gh@latest", "--", "gh", "auth", "status", "--hostname", "github.com"},
 		{"exec", "--yes", "--raw", "gh@latest", "--", "gh", "auth", "login", "--hostname", "github.com", "--git-protocol", "https", "--web"},
 		{"exec", "--yes", "--raw", "gh@latest", "--", "gh", "repo", "view", "roqem/home", "--json", "nameWithOwner"},
-		{"exec", "--yes", "--raw", "gh@latest", "--", "gh", "auth", "setup-git", "--hostname", "github.com"},
 	}
 	var gotMiseCalls [][]string
 	for _, call := range runner.runs {
@@ -133,6 +132,23 @@ func TestInitRetriesPrivateGitHubCloneWithMiseProvidedCLI(t *testing.T) {
 	}
 	if !reflect.DeepEqual(gotMiseCalls, wantMiseCalls) {
 		t.Fatalf("mise GitHub calls = %#v, want %#v", gotMiseCalls, wantMiseCalls)
+	}
+	helper := "!'/bin/mise' 'exec' '--yes' '--raw' 'gh@latest' '--' 'gh' 'auth' 'git-credential'"
+	for _, want := range [][]string{
+		{"-c", "credential.https://github.com.helper=", "-c", "credential.https://github.com.helper=" + helper, "clone", "--", "https://github.com/roqem/home.git", stateDir},
+		{"config", "--local", "--replace-all", "credential.https://github.com.helper", ""},
+		{"config", "--local", "--add", "credential.https://github.com.helper", helper},
+	} {
+		found := false
+		for _, call := range runner.runs {
+			if call.name == "git" && reflect.DeepEqual(call.args, want) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("missing repository-scoped Git call %#v in %#v", want, runner.runs)
+		}
 	}
 }
 
@@ -144,7 +160,7 @@ func TestInitSwitchesAccountWhenActiveGitHubAccountCannotAccessRepository(t *tes
 	runner := &fakeRunner{paths: map[string]string{"git": "/usr/bin/git", "gh": "/usr/bin/gh"}}
 	runner.runHook = func(call runCall) error {
 		switch {
-		case call.name == "git" && len(call.args) > 0 && call.args[0] == "clone":
+		case call.name == "git" && containsArgs(call.args, "clone", "--"):
 			cloneAttempts++
 			if cloneAttempts == 1 {
 				return errors.New("repository not found")

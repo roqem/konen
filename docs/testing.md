@@ -18,8 +18,8 @@ Linux integration journeys:
   `apply --dry-run`, completion generation and the project inspection/trust
   workflow with temporary configuration, state, home and backend binaries;
 - unit journeys prove that public GitHub state does not trigger authentication,
-  while a failed private HTTPS clone uses device login, configures Git and
-  retries without creating or importing SSH keys.
+  while a failed private HTTPS clone uses device login and a repository-scoped
+  helper without creating SSH keys or changing global Git configuration.
 
 The integration harness never applies the developer's machine state and never
 uses the developer's home directory.
@@ -27,7 +27,7 @@ uses the developer's home directory.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.4` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.5` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -44,7 +44,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.4 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.5 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -107,6 +107,11 @@ GitHub CLI device login and then succeed over HTTPS. Before `konen trust`,
 `status` must return a Konen error without displaying mise's trust prompt. After
 trust, `status` must distinguish requested, resolved and installed tool state,
 and `plan` must show the full bootstrap dry run rather than `nothing configured`.
+Compare `git config --global --show-origin --get-all
+credential.https://github.com.helper` before and after the clone: it must not
+change. The same key queried with `git -C "$HOME/remote-state-test" config
+--local --get-all` must show an empty reset entry followed by the machine-local
+GitHub CLI helper.
 
 Finally, exercise a project without requiring a graphical terminal:
 

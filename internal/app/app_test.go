@@ -275,6 +275,42 @@ func TestDotfileAddResolvesRelativePathFromWorkingDirectory(t *testing.T) {
 	}
 }
 
+func TestDotfileAddRefusesMachineSpecificGitAndCredentialFiles(t *testing.T) {
+	root := t.TempDir()
+	stateDir := filepath.Join(root, "state")
+	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
+	application := New(Options{
+		ConfigPath: filepath.Join(root, "config.toml"),
+		HomeDir:    root, Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, Runner: runner, Prompter: unusedPrompter{},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		path string
+		want string
+	}{
+		{"~/.gitconfig", "~/.config/git/config"},
+		{"~/.git-credentials", "contém credenciais"},
+		{"~/.config/gh/hosts.yml", "contém credenciais"},
+		{"~/.netrc", "contém credenciais"},
+		{"~/.ssh", "contém credenciais"},
+		{"~/.ssh/id_ed25519", "chave SSH privada"},
+	}
+	for _, test := range tests {
+		t.Run(test.path, func(t *testing.T) {
+			err := application.Run(context.Background(), []string{"dotfile", "add", test.path})
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("dotfile add error = %v", err)
+			}
+		})
+	}
+	if len(runner.runs) != 1 {
+		t.Fatalf("protected captures invoked mise: %#v", runner.runs)
+	}
+}
+
 func TestLegacyAddExplainsProjectAndDotfileCommands(t *testing.T) {
 	application := New(Options{Out: &bytes.Buffer{}, Err: &bytes.Buffer{}})
 	err := application.Run(context.Background(), []string{"add", "somewhere"})
