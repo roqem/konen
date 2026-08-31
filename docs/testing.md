@@ -25,6 +25,8 @@ uses the developer's home directory.
 
 The final release qualification must use a disposable VM and a published test
 version. Replace `v0.1.0-alpha.1` below if the candidate has another version.
+Tags with a prerelease suffix are published as GitHub prereleases and are not
+selected by an unpinned installer invocation.
 
 Install only the bootstrap prerequisites using the VM's package manager. On
 Ubuntu or Debian:

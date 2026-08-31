@@ -33,10 +33,15 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "$GITHUB_REF_NAME"
-          dist/konen_*.tar.gz
-          dist/checksums.txt
-          --generate-notes
-          --title "Konen $GITHUB_REF_NAME"
-          --verify-tag
+        run: |
+          release_flags=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            release_flags+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            dist/konen_*.tar.gz \
+            dist/checksums.txt \
+            --generate-notes \
+            --title "Konen $GITHUB_REF_NAME" \
+            --verify-tag \
+            "${release_flags[@]}"
