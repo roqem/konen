@@ -47,6 +47,9 @@ func TestPrepareLocalCreatesPortableState(t *testing.T) {
 	if !strings.Contains(string(data), `min_version = "2026.8.15"`) {
 		t.Fatalf("mise.toml does not pin the minimum supported mise version:\n%s", data)
 	}
+	if !strings.Contains(string(data), `"~/.config/mise/config.toml" = { source = "mise.toml", mode = "symlink" }`) {
+		t.Fatalf("mise.toml does not expose machine tools through the global mise config:\n%s", data)
+	}
 	if _, err := os.Stat(filepath.Join(path, "home", ".gitkeep")); err != nil {
 		t.Fatalf("home directory was not initialized: %v", err)
 	}

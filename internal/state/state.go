@@ -18,6 +18,9 @@ const defaultMiseConfig = `min_version = "2026.8.15"
 dotfiles.root = "home"
 dotfiles.default_mode = "symlink"
 
+[dotfiles]
+"~/.config/mise/config.toml" = { source = "mise.toml", mode = "symlink" }
+
 # Declare tools, packages, repositories and managed files here.
 # ` + "`konen add ~/.zshrc`" + ` adds a dotfile without inventing a second format.
 `

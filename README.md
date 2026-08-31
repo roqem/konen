@@ -48,7 +48,7 @@ Running `konen` opens an interactive menu. The same operations remain available
 as small commands for scripts and recovery environments:
 
 ```console
-konen init --git ~/my-machine
+konen init --git ~/home
 konen trust
 konen add ~/.zshrc
 konen status
@@ -77,7 +77,7 @@ that approval. See [docs/projects.md](docs/projects.md).
 An existing state repository can be cloned directly:
 
 ```console
-konen init --from git@github.com:you/my-machine.git
+konen init --from git@github.com:you/home.git
 less ~/.local/share/konen/state/mise.toml
 konen trust
 ```
@@ -87,10 +87,11 @@ cloned repositories require an explicit `konen trust` after inspection.
 
 ## State
 
-The initial state is deliberately ordinary:
+The directory and repository name are the user's choice; `home` is only an
+example. The initial state is deliberately ordinary:
 
 ```text
-my-machine/
+home/
 ├── .git/          # optional
 ├── .gitignore
 ├── mise.toml      # packages, tools, repos, services and dotfiles
@@ -99,7 +100,10 @@ my-machine/
 ```
 
 Konen stores only a pointer to that directory in
-`~/.config/konen/config.toml`. It never commits or pushes on your behalf.
+`~/.config/konen/config.toml`. The generated state also links its `mise.toml`
+as mise's global user config, so machine-wide tools remain available inside
+projects and project-local mise files can override them. Konen never commits or
+pushes on your behalf.
 
 ## Development
 
