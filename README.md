@@ -21,6 +21,8 @@ Konen está em **alpha**: o fluxo completo já foi validado em uma VM Ubuntu
 26.04 limpa, mas comandos e formato ainda podem mudar antes da primeira versão
 estável. A versão mínima do mise aceita pelo contrato atual é 2026.8.15.
 
+Os próximos marcos estão em [docs/roadmap.md](docs/roadmap.md).
+
 Konen não é outro gerenciador de pacotes. Ele cuida da experiência inicial,
 segurança, diagnóstico e sessões de projetos; mise continua sendo a fonte da
 verdade sobre o conteúdo da máquina.
@@ -101,7 +103,7 @@ configurações aos poucos usando os exemplos abaixo. O Konen nunca cria commits
 nem envia mudanças ao GitHub por você.
 
 Executar apenas `konen` abre um menu com as mesmas ações. `q`, Escape e Ctrl+C
-fecham o menu sem produzir um erro.
+fecham o menu.
 
 ## Restaurando um backup existente
 
@@ -252,7 +254,7 @@ em `~/.config/git/config`.
 
 ### Comandos pessoais
 
-Um comando pessoal é apenas um arquivo executável e versionado. Ele é melhor
+Um comando pessoal é um arquivo executável e versionado. Ele é melhor
 que um alias quando contém lógica, precisa receber argumentos ou será usado por
 uma aba de projeto.
 
