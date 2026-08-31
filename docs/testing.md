@@ -8,7 +8,7 @@ Run the complete local gate with:
 mise run check
 ```
 
-Besides formatting, static analysis and unit tests, `go test ./...` includes two
+Besides formatting, static analysis and unit tests, `go test ./...` includes
 Linux integration journeys:
 
 - the installer downloads real archives from an isolated local HTTP server,
@@ -27,7 +27,7 @@ uses the developer's home directory.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.5` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.6` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -44,7 +44,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.5 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.6 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -80,7 +80,7 @@ Expected results:
 - the real apply converges successfully inside the disposable VM;
 - the final status has no unexpected pending resources;
 - the state is an ordinary Git repository, Konen explains that it did not
-  commit anything, and its initial files are visible as untracked;
+  commit anything, and its initial files are visible as untracked.
 
 Check completion in the VM's shell. For Bash:
 
@@ -167,3 +167,23 @@ konen example --dry-run
 Record the VM distribution, architecture, candidate version and any command
 whose result differs from this checklist. Revert the VM snapshot afterward;
 the test is deliberately allowed to change that disposable home.
+
+## Latest qualification record
+
+`v0.1.0-alpha.6` passed the complete manual journey on 2026-08-31 in a clean
+Multipass VM running Ubuntu 26.04 LTS on `linux/amd64` with two CPUs and 4 GiB
+of memory. The private representative state required GitHub device login and
+then converged:
+
+- 24 apt packages and three auxiliary Git repositories;
+- eight dotfile entries;
+- 17 versioned user-space tools;
+- Chrome 152.0.7977.64, Kitty 0.45.0 and Neovim 0.12.5;
+- Docker Engine 29.7.2 with non-root access after a new login session;
+- Zsh as the account login shell, including a passwordless Multipass account.
+
+A second `konen plan` reported every declarative resource current. A second
+`konen apply --yes` invoked the four selected personal tasks, whose idempotence
+guards exited without reinstalling or changing the machine. `konen doctor`
+reported configuration, state, executable-surface approval, mise and Git as
+healthy.
