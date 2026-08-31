@@ -23,9 +23,11 @@ type runCall struct {
 }
 
 type fakeRunner struct {
-	paths   map[string]string
-	outputs map[string]string
-	runs    []runCall
+	paths      map[string]string
+	outputs    map[string]string
+	runs       []runCall
+	runHook    func(runCall) error
+	outputHook func(runCall) (string, error)
 }
 
 func (f *fakeRunner) LookPath(name string) (string, error) {
@@ -36,12 +38,20 @@ func (f *fakeRunner) LookPath(name string) (string, error) {
 }
 
 func (f *fakeRunner) Run(_ context.Context, dir, name string, args ...string) error {
-	f.runs = append(f.runs, runCall{dir: dir, name: name, args: append([]string(nil), args...)})
+	call := runCall{dir: dir, name: name, args: append([]string(nil), args...)}
+	f.runs = append(f.runs, call)
+	if f.runHook != nil {
+		return f.runHook(call)
+	}
 	return nil
 }
 
 func (f *fakeRunner) Output(_ context.Context, dir, name string, args ...string) (string, error) {
-	f.runs = append(f.runs, runCall{dir: dir, name: name, args: append([]string(nil), args...)})
+	call := runCall{dir: dir, name: name, args: append([]string(nil), args...)}
+	f.runs = append(f.runs, call)
+	if f.outputHook != nil {
+		return f.outputHook(call)
+	}
 	if output, ok := f.outputs[name]; ok {
 		return output, nil
 	}
@@ -123,6 +133,41 @@ func TestInitAndApply(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(stateDir, "mise.toml")); err != nil {
 		t.Fatalf("mise.toml missing: %v", err)
+	}
+	if !strings.Contains(out.String(), "O Konen não cria commits") {
+		t.Fatalf("init output does not explain Git ownership: %q", out.String())
+	}
+}
+
+func TestApplyDryRunExplainsTheInitialMiseTrustWarning(t *testing.T) {
+	root := t.TempDir()
+	stateDir := filepath.Join(root, "state")
+	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
+	var out bytes.Buffer
+	application := New(Options{
+		ConfigPath: filepath.Join(root, "config.toml"),
+		HomeDir:    root, Out: &out, Err: &out,
+		Runner: runner, Prompter: unusedPrompter{},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	runner.runs = nil
+	out.Reset()
+
+	if err := application.Run(context.Background(), []string{"apply", "--dry-run"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "no primeiro dry-run") {
+		t.Fatalf("dry-run output does not explain the one-time warning: %q", out.String())
+	}
+	want := runCall{
+		dir:  stateDir,
+		name: "/bin/mise",
+		args: []string{"-C", stateDir, "bootstrap", "--dry-run"},
+	}
+	if len(runner.runs) != 1 || !reflect.DeepEqual(runner.runs[0], want) {
+		t.Fatalf("runs = %#v, want %#v", runner.runs, want)
 	}
 }
 

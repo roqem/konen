@@ -15,7 +15,9 @@ The guided form asks for a short name, the project directory, an optional shell
 and one or more tabs. An empty command opens a login shell in the project. A
 non-empty command is passed to an interactive login shell with `-lic`, so the
 workspace sees the environment configured in `.zshrc`; `hold = true` asks Kitty
-to open a shell after the command exits.
+to open a shell after the command exits. The first tab defaults to a neutral
+`Terminal` with an empty command; editors such as Neovim are never assumed to
+be installed.
 
 Use the project from its directory or by name:
 

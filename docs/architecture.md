@@ -64,6 +64,34 @@ may support:
   editor or terminal. A future adapter may generate a tool's native format only
   when that format is required, previewable and has an unambiguous owner.
 
+## Remote bootstrap
+
+A private state repository introduces one unavoidable security boundary: the
+user must authenticate before Konen can read it. It does not require an SSH key
+or a browser on the new machine. The intended journey is deliberately split:
+
+1. the public installer places Konen and mise in the user's home without sudo;
+2. Konen installs or locates the minimal public prerequisites, including Git
+   and GitHub CLI when the selected remote needs them;
+3. GitHub CLI performs a device-code login and configures Git over HTTPS;
+4. Konen clones the private state, requires explicit review and trust, and only
+then delegates the declared machine plan to mise.
+
+An existing GitHub login is not accepted merely because it is valid: Konen
+checks that the active account can read the requested repository. If another
+account on the same host is needed, account switching is explicit; GitHub CLI's
+active account is host-wide rather than repository-local.
+
+SSH remains an optional post-bootstrap convenience. If selected, each machine
+gets its own key and only the public key is uploaded; private SSH keys never
+belong in the state repository. Tokens supplied for headless automation are
+accepted only through standard environment or credential-store mechanisms and
+are never copied into state.
+
+The public phase is a fixed capability bootstrap, not a hidden personal package
+list. Chrome, editors, Docker and other workstation choices remain visible in
+the user's mise state and in `konen plan`.
+
 ## Extensions
 
 ### Themes

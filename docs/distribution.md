@@ -46,6 +46,11 @@ GitHub artifact attestation with `gh attestation verify`, and then execute the
 installer locally.
 
 The installer never runs Konen as root and does not edit shell startup files.
+For a private `github:OWNER/REPO` state, the later interactive `konen init`
+step may use mise to download an ad-hoc GitHub CLI tool. Mise may cache that
+tool, but it is not silently added to the user's declared machine state. Konen
+explains the action before starting device-code authentication and never
+receives or stores the resulting token itself.
 
 ## Later packaging
 

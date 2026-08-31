@@ -125,7 +125,7 @@ func (a *App) runInit(ctx context.Context, args []string) error {
 	flags := flag.NewFlagSet("init", flag.ContinueOnError)
 	flags.SetOutput(a.options.Err)
 	initializeGit := flags.Bool("git", false, "inicializa um repositório Git")
-	remote := flags.String("from", "", "clona um repositório Git")
+	remote := flags.String("from", "", "clona um estado Git; use github:OWNER/REPO para login assistido")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -153,12 +153,20 @@ func (a *App) runInit(ctx context.Context, args []string) error {
 		return err
 	}
 	createdLocalConfig := false
+	gitEnabled := false
 	if answer.Remote != "" {
-		err = a.state.Clone(ctx, answer.Remote, resolved)
+		err = a.cloneRemoteState(ctx, answer.Remote, resolved)
 	} else {
 		_, statErr := os.Stat(filepath.Join(resolved, "mise.toml"))
 		createdLocalConfig = errors.Is(statErr, fs.ErrNotExist)
 		err = a.state.PrepareLocal(ctx, resolved, answer.InitializeGit)
+		if err == nil {
+			gitEnabled = answer.InitializeGit
+			if !gitEnabled {
+				_, gitErr := os.Stat(filepath.Join(resolved, ".git"))
+				gitEnabled = gitErr == nil
+			}
+		}
 	}
 	if err != nil {
 		return err
@@ -178,6 +186,9 @@ func (a *App) runInit(ctx context.Context, args []string) error {
 	}
 
 	fmt.Fprintf(a.options.Out, "Konen configurado. Estado: %s\n", resolved)
+	if answer.Remote == "" && gitEnabled {
+		fmt.Fprintln(a.options.Out, "Git ativo. O Konen não cria commits; revise e versione as mudanças quando estiver pronto.")
+	}
 	switch {
 	case trusted:
 		fmt.Fprintln(a.options.Out, "Próximo passo: execute `konen apply`.")
@@ -207,6 +218,10 @@ func (a *App) runApply(ctx context.Context, args []string) error {
 	}
 	if *dryRun {
 		miseArgs = append(miseArgs, "--dry-run")
+		globalMiseConfig := filepath.Join(a.options.HomeDir, ".config", "mise", "config.toml")
+		if _, err := os.Lstat(globalMiseConfig); errors.Is(err, fs.ErrNotExist) {
+			fmt.Fprintln(a.options.Out, "Nota: no primeiro dry-run, o mise pode avisar que ~/.config/mise/config.toml ainda não é confiável; o arquivo só será criado pelo apply.")
+		}
 	}
 	return a.runMise(ctx, miseArgs)
 }
@@ -433,7 +448,7 @@ func (a *App) printHelp() {
 	})
 	a.printCommandGroup("Máquina", [][2]string{
 		{"konen init [--git] [DIR]", "configura ou cria o estado"},
-		{"konen init --from URL [DIR]", "clona um estado existente"},
+		{"konen init --from ORIGEM [DIR]", "clona um estado; GitHub privado tem login assistido"},
 		{"konen status", "mostra tudo que o estado declara"},
 		{"konen plan", "mostra exatamente o que mudaria"},
 		{"konen apply [--dry-run]", "aplica o estado com mise"},

@@ -182,6 +182,7 @@ esac
 
 	output := runCommand(t, root, environment, konen, "init", "--git", stateDir)
 	assertContains(t, output, "Konen configurado")
+	assertContains(t, output, "O Konen não cria commits")
 	assertContains(t, output, "Próximo passo: execute `konen apply`.")
 	for _, expected := range []string{
 		filepath.Join(stateDir, ".git"),

@@ -103,7 +103,7 @@ _konen() {
       _arguments \
         '(-h --help)'{-h,--help}'[mostra ajuda]' \
         '--git[inicializa um repositório Git]' \
-        '--from=[clona um repositório Git]:URL do repositório:_urls' \
+		'--from=[clona um estado; github:OWNER/REPO ativa login assistido]:origem do repositório:_urls' \
         '1:pasta do estado:_directories'
       ;;
     status|plan|diff|projects|trust|doctor|version|help)
@@ -243,7 +243,7 @@ complete -c konen -n '__fish_use_subcommand' -a version -d 'Mostra a versão'
 complete -c konen -n '__fish_use_subcommand' -a help -d 'Mostra ajuda'
 complete -c konen -n '__fish_use_subcommand' -a '(konen __complete projects 2>/dev/null)' -d 'Abre o projeto'
 complete -c konen -n '__fish_seen_subcommand_from init' -l git -d 'Inicializa um repositório Git'
-complete -c konen -n '__fish_seen_subcommand_from init' -l from -r -d 'Clona um repositório Git'
+complete -c konen -n '__fish_seen_subcommand_from init' -l from -r -d 'Clona um estado; GitHub privado tem login assistido'
 complete -c konen -n '__fish_seen_subcommand_from apply' -l yes -d 'Não pede confirmação'
 complete -c konen -n '__fish_seen_subcommand_from apply' -l dry-run -d 'Mostra o plano sem alterar a máquina'
 complete -c konen -n '__fish_seen_subcommand_from dotfile' -a add -d 'Adiciona um dotfile ao estado'

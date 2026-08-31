@@ -115,7 +115,10 @@ func (p HuhPrompter) Init(defaultPath string) (InitAnswer, error) {
 	}
 	if source == "remote" {
 		fields = append([]huh.Field{
-			huh.NewInput().Title("URL do repositório Git").Value(&answer.Remote),
+			huh.NewInput().
+				Title("Origem do repositório Git").
+				Description("Use github:OWNER/REPO para login HTTPS assistido.").
+				Value(&answer.Remote),
 		}, fields...)
 	} else {
 		fields = append(fields,
@@ -195,7 +198,7 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 	for addAnother {
 		tab := ProjectTabAnswer{}
 		if len(tabs) == 0 {
-			tab = ProjectTabAnswer{Title: "Editor", Command: "nvim ."}
+			tab = defaultProjectTab()
 		}
 		addAnother = false
 		form := huh.NewForm(huh.NewGroup(
@@ -224,6 +227,10 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 	answer.Shell = strings.TrimSpace(answer.Shell)
 	answer.Tabs = tabs
 	return answer, nil
+}
+
+func defaultProjectTab() ProjectTabAnswer {
+	return ProjectTabAnswer{Title: "Terminal"}
 }
 
 func (p HuhPrompter) ChooseProject(names []string) (string, error) {

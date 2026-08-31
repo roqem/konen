@@ -19,7 +19,8 @@ machine itself.
 ## Status
 
 Pre-alpha. The state format, local workflow and release infrastructure are
-implemented, but there is no published release yet.
+implemented, and the first candidate is published as a prerelease for clean-VM
+qualification. There is no stable release yet.
 
 ## Installation
 
@@ -99,13 +100,21 @@ window; outside Kitty it starts a native Kitty session in a new window. Project
 commands must be approved locally and any out-of-band manifest change revokes
 that approval. See [docs/projects.md](docs/projects.md).
 
-An existing state repository can be cloned directly:
+An existing state repository can be cloned directly. The `github:` form uses
+HTTPS and, if a private clone requires authentication, guides a device-code
+login that may be completed in a browser on another device:
 
 ```console
-konen init --from git@github.com:you/home.git
+konen init --from github:you/home
 less ~/.local/share/konen/state/mise.toml
 konen trust
 ```
+
+SSH remains optional. When GitHub CLI is unavailable, Konen transparently uses
+the co-installed mise to run `gh@latest` for authentication without sudo; this
+bootstrap helper is not added to the user's machine state. If GitHub CLI has
+multiple accounts, Konen verifies repository access and explicitly asks it to
+switch accounts when the active one cannot read the selected state.
 
 Fresh state created by Konen is trusted automatically. Existing folders and
 cloned repositories require an explicit `konen trust` after inspection.
