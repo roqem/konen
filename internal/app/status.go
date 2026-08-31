@@ -23,13 +23,9 @@ func (a *App) runStatus(ctx context.Context, args []string) error {
 	if len(args) != 0 {
 		return errors.New("status não aceita argumentos")
 	}
-	stateDir, err := a.loadState()
+	stateDir, misePath, err := a.loadTrustedMise(ctx)
 	if err != nil {
 		return err
-	}
-	misePath, err := a.findCommand("mise")
-	if err != nil {
-		return errors.New("mise não está instalado; consulte https://mise.jdx.dev/installing-mise.html")
 	}
 	output, err := a.options.Runner.Output(ctx, stateDir, misePath, "-C", stateDir, "bootstrap", "status", "--json")
 	if err != nil {
@@ -313,7 +309,7 @@ var statusFields = map[string]string{
 	"source":            "Fonte",
 	"mode":              "Modo",
 	"requested_version": "Versão pedida",
-	"resolved_version":  "Versão atual",
+	"resolved_version":  "Versão resolvida",
 	"version":           "Versão",
 	"installed":         "Instalado",
 	"enabled":           "Habilitado",

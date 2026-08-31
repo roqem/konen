@@ -118,6 +118,9 @@ switch accounts when the active one cannot read the selected state.
 
 Fresh state created by Konen is trusted automatically. Existing folders and
 cloned repositories require an explicit `konen trust` after inspection.
+Until then, Konen refuses every mise-backed operation — including `status`,
+`plan`, `diff`, dotfile capture and `apply` — instead of allowing mise to open
+its own trust prompt.
 
 ## State
 
@@ -139,8 +142,9 @@ as mise's global user config, so machine-wide tools remain available inside
 projects and project-local mise files can override them. Konen never commits or
 pushes on your behalf.
 
-`konen status` lists every package, tool, service, repository and managed file
-declared by the state. `konen plan` shows the exact pending changes before
+After trust, `konen status` lists every package, tool, service, repository and
+managed file declared by the state. `konen plan` runs the complete bootstrap
+dry run, showing dotfiles and tools as well as other pending changes before
 `konen apply`; Konen does not keep a second, hidden installation list.
 
 ## Development

@@ -27,7 +27,7 @@ uses the developer's home directory.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.3` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.4` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -44,7 +44,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.3 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.4 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -89,6 +89,24 @@ eval "$(konen completion bash)"
 ```
 
 Typing `konen p` followed by Tab should offer `plan`, `project` and `projects`.
+
+Exercise private remote bootstrap in an isolated Konen configuration, replacing
+the repository with one the tester can read:
+
+```console
+export XDG_CONFIG_HOME="$HOME/.config-konen-remote-test"
+konen init --from github:OWNER/REPOSITORY "$HOME/remote-state-test"
+konen status
+konen trust
+konen status
+konen plan
+```
+
+The initial clone must fail without a Git username prompt, continue through
+GitHub CLI device login and then succeed over HTTPS. Before `konen trust`,
+`status` must return a Konen error without displaying mise's trust prompt. After
+trust, `status` must distinguish requested, resolved and installed tool state,
+and `plan` must show the full bootstrap dry run rather than `nothing configured`.
 
 Finally, exercise a project without requiring a graphical terminal:
 

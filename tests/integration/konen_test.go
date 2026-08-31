@@ -153,11 +153,11 @@ if [ "${1:-}" = "--version" ]; then
   exit 0
 fi
 case " $* " in
+  *" trust --show "*)
+    printf '%s: trusted\n' "$PWD"
+    ;;
   *" bootstrap status --json "*)
     printf '%s\n' '{"tools":[{"tool":"go","requested_version":"1.27.0","resolved_version":"1.27.0","state":"installed","installed":true}]}'
-    ;;
-  *" bootstrap plan "*)
-    printf 'fixture plan: no host changes\n'
     ;;
   *" bootstrap --dry-run "*)
     printf 'fixture apply: dry run\n'
@@ -206,7 +206,7 @@ esac
 		assertContains(t, output, fragment)
 	}
 	output = runCommand(t, root, environment, konen, "plan")
-	assertContains(t, output, "fixture plan: no host changes")
+	assertContains(t, output, "fixture apply: dry run")
 	output = runCommand(t, root, environment, konen, "apply", "--dry-run")
 	assertContains(t, output, "fixture apply: dry run")
 
@@ -257,8 +257,8 @@ hold = true
 	log := string(logData)
 	for _, invocation := range []string{
 		"trust " + filepath.Join(stateDir, "mise.toml"),
+		"trust --show",
 		"bootstrap status --json",
-		"bootstrap plan",
 		"bootstrap --dry-run",
 	} {
 		assertContains(t, log, invocation)

@@ -80,7 +80,7 @@ func (a *App) run(ctx context.Context, args []string) error {
 	case "status":
 		return a.runStatus(ctx, args[1:])
 	case "plan":
-		return a.runMise(ctx, []string{"bootstrap", "plan"})
+		return a.runApply(ctx, []string{"--dry-run"})
 	case "diff":
 		return a.runMise(ctx, []string{"bootstrap", "dotfiles", "diff"})
 	case "apply":
@@ -295,19 +295,48 @@ func (a *App) resolveDotfileTarget(target string) (string, error) {
 }
 
 func (a *App) runMise(ctx context.Context, args []string) error {
-	stateDir, err := a.loadState()
+	stateDir, misePath, err := a.loadTrustedMise(ctx)
 	if err != nil {
 		return err
-	}
-	misePath, err := a.findCommand("mise")
-	if err != nil {
-		return errors.New("mise não está instalado; consulte https://mise.jdx.dev/installing-mise.html")
 	}
 	miseArgs := append([]string{"-C", stateDir}, args...)
 	if err := a.options.Runner.Run(ctx, stateDir, misePath, miseArgs...); err != nil {
 		return fmt.Errorf("mise: %w", err)
 	}
 	return nil
+}
+
+func (a *App) loadTrustedMise(ctx context.Context) (string, string, error) {
+	stateDir, err := a.loadState()
+	if err != nil {
+		return "", "", err
+	}
+	misePath, err := a.findCommand("mise")
+	if err != nil {
+		return "", "", errors.New("mise não está instalado; consulte https://mise.jdx.dev/installing-mise.html")
+	}
+	output, err := a.options.Runner.Output(ctx, stateDir, misePath, "-C", stateDir, "trust", "--show")
+	if err != nil {
+		return "", "", fmt.Errorf("não foi possível consultar a confiança do estado: %w", err)
+	}
+	if !miseTrustOutputIsTrusted(output) {
+		return "", "", fmt.Errorf("estado ainda não confiado; revise %s e execute `konen trust`", filepath.Join(stateDir, "mise.toml"))
+	}
+	return stateDir, misePath, nil
+}
+
+func miseTrustOutputIsTrusted(output string) bool {
+	trusted := false
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasSuffix(line, ": untrusted") {
+			return false
+		}
+		if strings.HasSuffix(line, ": trusted") {
+			trusted = true
+		}
+	}
+	return trusted
 }
 
 func (a *App) runTrust(ctx context.Context, args []string) error {

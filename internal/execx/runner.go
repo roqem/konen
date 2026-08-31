@@ -46,7 +46,6 @@ func (r OSRunner) RunEnv(ctx context.Context, dir string, environment []string, 
 func (r OSRunner) Output(ctx context.Context, dir, name string, args ...string) (string, error) {
 	command := exec.CommandContext(ctx, name, args...)
 	command.Dir = dir
-	command.Stdin = r.In
 	command.Stderr = r.Err
 	output, err := command.Output()
 	return string(output), err

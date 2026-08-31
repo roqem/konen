@@ -65,6 +65,9 @@ func (f *fakeRunner) Output(_ context.Context, dir, name string, args ...string)
 	if f.outputHook != nil {
 		return f.outputHook(call)
 	}
+	if len(args) >= 2 && args[len(args)-2] == "trust" && args[len(args)-1] == "--show" {
+		return dir + ": trusted\n", nil
+	}
 	if output, ok := f.outputs[name]; ok {
 		return output, nil
 	}
@@ -133,7 +136,7 @@ func TestInitAndApply(t *testing.T) {
 		name: "/bin/mise",
 		args: []string{"-C", stateDir, "bootstrap", "--yes"},
 	}
-	if len(runner.runs) != 3 || !reflect.DeepEqual(runner.runs[2], want) {
+	if len(runner.runs) != 4 || !reflect.DeepEqual(runner.runs[3], want) {
 		t.Fatalf("runs = %#v, want final call %#v", runner.runs, want)
 	}
 	wantTrust := runCall{
@@ -179,8 +182,17 @@ func TestApplyDryRunExplainsTheInitialMiseTrustWarning(t *testing.T) {
 		name: "/bin/mise",
 		args: []string{"-C", stateDir, "bootstrap", "--dry-run"},
 	}
-	if len(runner.runs) != 1 || !reflect.DeepEqual(runner.runs[0], want) {
+	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1], want) {
 		t.Fatalf("runs = %#v, want %#v", runner.runs, want)
+	}
+}
+
+func TestMiseTrustOutputRejectsAnyUntrustedConfig(t *testing.T) {
+	if miseTrustOutputIsTrusted("/parent: trusted\n/state: untrusted\n") {
+		t.Fatal("mixed trust output was accepted")
+	}
+	if !miseTrustOutputIsTrusted("/parent: trusted\n/state: trusted\n") {
+		t.Fatal("fully trusted output was rejected")
 	}
 }
 
@@ -233,7 +245,7 @@ func TestDotfileAddPinsTheStateConfig(t *testing.T) {
 		"--mode", "copy",
 		"/tmp/example",
 	}
-	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1].args, want) {
+	if len(runner.runs) != 3 || !reflect.DeepEqual(runner.runs[2].args, want) {
 		t.Fatalf("mise args = %#v, want %#v", runner.runs, want)
 	}
 }
@@ -258,7 +270,7 @@ func TestDotfileAddResolvesRelativePathFromWorkingDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := filepath.Join(workDir, "config", "example.toml")
-	if got := runner.runs[1].args[len(runner.runs[1].args)-1]; got != want {
+	if got := runner.runs[2].args[len(runner.runs[2].args)-1]; got != want {
 		t.Fatalf("relative target = %q, want %q", got, want)
 	}
 }
@@ -300,12 +312,12 @@ func TestDiffUsesNativeMiseDiff(t *testing.T) {
 		"-C", stateDir,
 		"bootstrap", "dotfiles", "diff",
 	}
-	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1].args, want) {
+	if len(runner.runs) != 3 || !reflect.DeepEqual(runner.runs[2].args, want) {
 		t.Fatalf("mise args = %#v, want %#v", runner.runs, want)
 	}
 }
 
-func TestPlanUsesNativeMisePlan(t *testing.T) {
+func TestPlanUsesFullBootstrapDryRun(t *testing.T) {
 	root := t.TempDir()
 	stateDir := filepath.Join(root, "state")
 	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
@@ -325,8 +337,8 @@ func TestPlanUsesNativeMisePlan(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := []string{"-C", stateDir, "bootstrap", "plan"}
-	if len(runner.runs) != 2 || !reflect.DeepEqual(runner.runs[1].args, want) {
+	want := []string{"-C", stateDir, "bootstrap", "--dry-run"}
+	if len(runner.runs) != 3 || !reflect.DeepEqual(runner.runs[2].args, want) {
 		t.Fatalf("mise args = %#v, want %#v", runner.runs, want)
 	}
 }
