@@ -75,6 +75,34 @@ func (s TrustStore) Trust(manifestPath string) error {
 	return s.save(file)
 }
 
+// Revoke removes any previous approval for a manifest path. Migrations use it
+// even when the resulting bytes happen to match content approved in the past:
+// crossing a format boundary always requires a fresh explicit review.
+func (s TrustStore) Revoke(manifestPath string) error {
+	canonical, err := filepath.Abs(manifestPath)
+	if err != nil {
+		return err
+	}
+	file, err := s.load()
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	filtered := file.Projects[:0]
+	for _, entry := range file.Projects {
+		if entry.Path != canonical {
+			filtered = append(filtered, entry)
+		}
+	}
+	if len(filtered) == len(file.Projects) {
+		return nil
+	}
+	file.Projects = filtered
+	return s.save(file)
+}
+
 func (s TrustStore) load() (trustFile, error) {
 	data, err := os.ReadFile(s.Path)
 	if err != nil {

@@ -110,6 +110,8 @@ func (a *App) run(ctx context.Context, args []string) error {
 		return a.runDoctor(ctx)
 	case "update":
 		return a.runUpdate(ctx, args[1:])
+	case "migrate":
+		return a.runMigrate(args[1:])
 	case "dev":
 		return a.runDev(ctx, args[1:])
 	case "project":
@@ -504,6 +506,17 @@ func (a *App) runDoctor(ctx context.Context) error {
 	} else {
 		fmt.Fprintf(a.options.Out, "✓ configuração: %s\n", a.options.ConfigPath)
 		fmt.Fprintf(a.options.Out, "✓ estado: %s\n", stateDir)
+		migrationPlan, migrationErr := a.buildMigrationPlan()
+		switch {
+		case migrationErr != nil:
+			fmt.Fprintf(a.options.Out, "✗ formatos: %v\n", migrationErr)
+			healthy = false
+		case len(migrationPlan.pending()) > 0:
+			fmt.Fprintf(a.options.Out, "✗ formatos: %d migração(ões) pendente(s); execute `konen migrate --dry-run`\n", len(migrationPlan.pending()))
+			healthy = false
+		default:
+			fmt.Fprintln(a.options.Out, "✓ formatos: configuração e projetos compatíveis")
+		}
 		trusted, trustErr := a.stateTrust().IsTrusted(stateDir)
 		switch {
 		case trustErr != nil:
@@ -635,6 +648,7 @@ func (a *App) printHelp() {
 		{"konen apply --only ETAPAS", "aplica somente etapas separadas por vírgula"},
 		{"konen trust", "confia no mise.toml após revisão"},
 		{"konen doctor", "diagnostica a instalação"},
+		{"konen migrate [--dry-run]", "revisa e aplica migrações dos formatos do Konen"},
 		{"konen update [--dry-run]", "mostra versões e atualiza Konen e mise após confirmação"},
 	})
 	a.printCommandGroup("Estado", [][2]string{

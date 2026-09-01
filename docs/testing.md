@@ -20,7 +20,9 @@ Linux integration journeys:
   `apply --dry-run`, a real apply against a stateful fake backend, completion
   generation and the project inspection/trust workflow with temporary
   configuration, state, home and backend binaries; the real apply must compare
-  structured status and summarize the resource that changed;
+  structured status and summarize the resource that changed; the same built
+  executable must preview and migrate legacy local/project formats, preserve
+  dry-run bytes, create backups and invalidate project approval;
 - unit journeys prove that public GitHub state does not trigger authentication,
   while a failed private HTTPS clone uses device login and a repository-scoped
   helper without creating SSH keys or changing global Git configuration.
@@ -31,7 +33,7 @@ uses the developer's home directory.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.16` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.17` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -48,7 +50,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.16 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.17 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -124,20 +126,58 @@ Expected results:
 
 To qualify the updater itself, install a published prerelease that already
 contains `konen update` in a disposable VM, then let it discover this candidate.
-Alpha.15 is the first such release:
+Alpha.15 is the first such release. For this candidate, use alpha.16:
 
 ```console
-KONEN_VERSION=v0.1.0-alpha.15 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.16 sh install.sh
 konen update --dry-run --only konen
 konen version
 konen update --yes --only konen
 konen version
 ```
 
-The dry run must show alpha.15 as current and alpha.16 as available without
+The dry run must show alpha.16 as current and alpha.17 as available without
 changing the first `konen version`. The confirmed command must verify, stage and
-install alpha.16. The configured state path and its Git status must remain
+install alpha.17. The configured state path and its Git status must remain
 unchanged.
+
+Qualify format migration with an isolated configuration and state, never the
+representative private state. Create a current project manifest, approve it,
+then remove only the two version declarations to simulate legacy version zero:
+
+```console
+export XDG_CONFIG_HOME="$HOME/.config-konen-migration-test"
+konen init --git "$HOME/home-migration-test"
+mkdir -p "$HOME/Projects/migration-example"
+printf '%s\n' \
+  'version = 1' \
+  'path = "~/Projects/migration-example"' \
+  'keep_invoking_tab = true' \
+  '' \
+  '[[tabs]]' \
+  'title = "Terminal"' \
+  > "$HOME/home-migration-test/projects/migration-example.toml"
+konen project trust migration-example
+sed -i '/^version = /d' "$XDG_CONFIG_HOME/konen/config.toml"
+sed -i '/^version = /d' "$HOME/home-migration-test/projects/migration-example.toml"
+sha256sum "$XDG_CONFIG_HOME/konen/config.toml" \
+  "$HOME/home-migration-test/projects/migration-example.toml"
+konen doctor
+konen migrate --dry-run
+sha256sum "$XDG_CONFIG_HOME/konen/config.toml" \
+  "$HOME/home-migration-test/projects/migration-example.toml"
+konen migrate --yes
+konen doctor
+konen projects
+find "$XDG_CONFIG_HOME/konen/migration-backups" -type f -print
+```
+
+`doctor` must first reject the legacy local configuration with migration
+guidance. The dry run must show two `v0 → v1` diffs while both checksums remain
+unchanged. The confirmed migration must create private backups, make `doctor`
+healthy and leave the project under `revisão necessária`; approving commands is
+an explicit later action. A fabricated `version = 99` must be rejected with
+guidance to update Konen and must never be rewritten.
 
 After the real apply, exercise installer authoring without adding an incomplete
 task to the applied journey:

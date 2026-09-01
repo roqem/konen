@@ -62,7 +62,8 @@ Objetivo: tornar manutenção e atualização tão claras quanto o primeiro uso.
 - [x] oferecer filtros de status para itens ausentes, diferentes ou por categoria;
 - [x] projetar atualização explícita do Konen e do mise, com versão e plano
   visíveis;
-- [ ] definir migrações compatíveis para qualquer mudança futura do estado;
+- [x] definir migrações explícitas para os formatos próprios do Konen, sem
+  versionar ou reescrever o `mise.toml` nativo;
 - [ ] modelar ações nomeadas de projeto, como preparar, testar, abrir console ou
   gerar cobertura, sem transformá-las em funções escondidas do Konen;
 - [ ] permitir que abas reutilizem essas ações em vez de duplicar comandos longos.

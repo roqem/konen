@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/pelletier/go-toml/v2"
+	"github.com/roqem/konen/internal/compat"
 )
 
 const currentVersion = 1
@@ -14,6 +15,18 @@ const currentVersion = 1
 type Config struct {
 	Version  int    `toml:"version"`
 	StateDir string `toml:"state_dir"`
+}
+
+type Migration struct {
+	FromVersion int
+	ToVersion   int
+	Before      []byte
+	After       []byte
+	Config      Config
+}
+
+func (m Migration) Needed() bool {
+	return m.FromVersion != m.ToVersion
 }
 
 func DefaultPath() (string, error) {
@@ -29,18 +42,83 @@ func Load(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	return Decode(data, path)
+}
 
+func Decode(data []byte, path string) (Config, error) {
+	version, _, err := compat.TOMLVersion(data)
+	if err != nil {
+		return Config{}, fmt.Errorf("configuração inválida em %s: %w", path, err)
+	}
+	if version != currentVersion {
+		return Config{}, fmt.Errorf("configuração incompatível em %s: %w", path, compat.VersionError{
+			Format: "a configuração local", Found: version, Current: currentVersion,
+			Migratable: version == 0,
+		})
+	}
+	return decodeCurrent(data, path)
+}
+
+func PlanMigration(path string) (Migration, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Migration{}, err
+	}
+	version, present, err := compat.TOMLVersion(data)
+	if err != nil {
+		return Migration{}, fmt.Errorf("configuração inválida em %s: %w", path, err)
+	}
+	if version < 0 || version > currentVersion {
+		return Migration{}, fmt.Errorf("configuração incompatível em %s: %w", path, compat.VersionError{Format: "a configuração local", Found: version, Current: currentVersion})
+	}
+	after := append([]byte(nil), data...)
+	for next := version; next < currentVersion; next++ {
+		switch next {
+		case 0:
+			after, err = migrateZeroToOne(after, present)
+		default:
+			return Migration{}, fmt.Errorf("configuração incompatível em %s: %w", path, compat.VersionError{Format: "a configuração local", Found: next, Current: currentVersion})
+		}
+		if err != nil {
+			return Migration{}, fmt.Errorf("não foi possível migrar a configuração em %s: %w", path, err)
+		}
+		present = true
+	}
+	cfg, err := decodeCurrent(after, path)
+	if err != nil {
+		return Migration{}, err
+	}
+	return Migration{
+		FromVersion: version, ToVersion: currentVersion,
+		Before: append([]byte(nil), data...), After: after, Config: cfg,
+	}, nil
+}
+
+func decodeCurrent(data []byte, path string) (Config, error) {
 	var cfg Config
 	if err := toml.Unmarshal(data, &cfg); err != nil {
 		return Config{}, fmt.Errorf("configuração inválida em %s: %w", path, err)
-	}
-	if cfg.Version != currentVersion {
-		return Config{}, fmt.Errorf("versão de configuração não suportada: %d", cfg.Version)
 	}
 	if cfg.StateDir == "" {
 		return Config{}, errors.New("state_dir não foi definido")
 	}
 	return cfg, nil
+}
+
+func migrateZeroToOne(data []byte, versionPresent bool) ([]byte, error) {
+	if !versionPresent {
+		return append([]byte("version = 1\n"), data...), nil
+	}
+	var document map[string]any
+	if err := toml.Unmarshal(data, &document); err != nil {
+		return nil, err
+	}
+	document["version"] = int64(1)
+	updated, err := toml.Marshal(document)
+	if err != nil {
+		return nil, err
+	}
+	return updated, nil
 }
 
 func Save(path string, cfg Config) error {

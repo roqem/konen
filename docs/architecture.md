@@ -19,6 +19,22 @@ titles and commands — that mise does not model. It lives under `projects/` in
 the central state repository, never as an arbitrary Kitty file in the source
 repository. Kitty remains the execution and layout engine.
 
+## Compatibility boundary
+
+Only the local `config.toml` and `projects/*.toml` manifests are portable Konen
+formats. They carry explicit integer versions. The native `mise.toml`, task
+files, personal commands and dotfiles do not receive a parallel Konen schema.
+Local state/project trust records are rebuildable approval caches rather than
+portable state.
+
+Readers reject older formats with guidance to inspect `konen migrate`, and
+reject newer formats with guidance to update the binary. Migration is explicit:
+it renders every affected diff, confirms that inputs did not change during
+review, writes private backups outside the state repository and replaces files
+atomically. A failed multi-file operation rolls back files already replaced.
+Project-manifest migration intentionally invalidates its content-bound local
+approval.
+
 ## Trust and mutation
 
 - State remains a normal directory and may be a normal Git repository.

@@ -68,6 +68,7 @@ _konen() {
     'plan:mostra exatamente o que mudaria'
     'diff:mostra diferenças dos dotfiles'
     'apply:aplica o estado com mise'
+    'migrate:revisa e aplica migrações de formatos'
     'update:mostra versões e atualiza Konen e mise'
     'tool:gerencia ferramentas do estado'
     'package:gerencia pacotes do sistema no estado'
@@ -124,7 +125,7 @@ _konen() {
       _arguments \
         '(-h --help)'{-h,--help}'[mostra ajuda]' \
         '--git[inicializa um repositório Git]' \
-		'--from=[clona um estado; github:OWNER/REPO ativa login assistido]:origem do repositório:_urls' \
+        '--from=[clona um estado; github:OWNER/REPO ativa login assistido]:origem do repositório:_urls' \
         '1:pasta do estado:_directories'
       ;;
     status)
@@ -149,6 +150,12 @@ _konen() {
         '--dry-run[mostra o plano sem alterar a máquina]' \
         '--select[escolhe as etapas interativamente]' \
         '--only=[limita a etapas separadas por vírgula]:etapas:(packages repos dotfiles tools task)'
+      ;;
+    migrate)
+      _arguments \
+        '(-h --help)'{-h,--help}'[mostra ajuda]' \
+        '--dry-run[mostra migrações sem alterar arquivos]' \
+        '--yes[migra sem pedir confirmação]'
       ;;
     update)
       _arguments \
@@ -319,7 +326,7 @@ const bashCompletion = `_konen_completion() {
   command="${COMP_WORDS[1]}"
 
   if [[ $COMP_CWORD -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W "init status plan diff apply update tool package repo command installer dotfile projects project dev trust doctor completion version help $(konen __complete projects 2>/dev/null)" -- "$current") )
+    COMPREPLY=( $(compgen -W "init status plan diff apply migrate update tool package repo command installer dotfile projects project dev trust doctor completion version help $(konen __complete projects 2>/dev/null)" -- "$current") )
     return
   fi
 
@@ -345,6 +352,9 @@ const bashCompletion = `_konen_completion() {
       ;;
     apply)
       COMPREPLY=( $(compgen -W '--yes --dry-run --select --only -h --help' -- "$current") )
+      ;;
+    migrate)
+      COMPREPLY=( $(compgen -W '--yes --dry-run -h --help' -- "$current") )
       ;;
     update)
       if [[ $previous == --only ]]; then
@@ -444,6 +454,7 @@ complete -c konen -n '__fish_use_subcommand' -a status -d 'Mostra tudo que o est
 complete -c konen -n '__fish_use_subcommand' -a plan -d 'Mostra exatamente o que mudaria'
 complete -c konen -n '__fish_use_subcommand' -a diff -d 'Mostra diferenças dos dotfiles'
 complete -c konen -n '__fish_use_subcommand' -a apply -d 'Aplica o estado com mise'
+complete -c konen -n '__fish_use_subcommand' -a migrate -d 'Revisa e aplica migrações de formatos'
 complete -c konen -n '__fish_use_subcommand' -a update -d 'Mostra versões e atualiza Konen e mise'
 complete -c konen -n '__fish_use_subcommand' -a tool -d 'Gerencia ferramentas do estado'
 complete -c konen -n '__fish_use_subcommand' -a package -d 'Gerencia pacotes do sistema no estado'
@@ -466,6 +477,8 @@ complete -c konen -n '__fish_seen_subcommand_from status' -l only -r -a 'package
 complete -c konen -n '__fish_seen_subcommand_from status' -l state -r -a 'ready pending missing different unknown' -d 'Limita a situações'
 complete -c konen -n '__fish_seen_subcommand_from apply' -l yes -d 'Não pede confirmação'
 complete -c konen -n '__fish_seen_subcommand_from apply' -l dry-run -d 'Mostra o plano sem alterar a máquina'
+complete -c konen -n '__fish_seen_subcommand_from migrate' -l dry-run -d 'Mostra migrações sem alterar arquivos'
+complete -c konen -n '__fish_seen_subcommand_from migrate' -l yes -d 'Migra sem pedir confirmação'
 complete -c konen -n '__fish_seen_subcommand_from update' -l dry-run -d 'Mostra versões e ações sem atualizar'
 complete -c konen -n '__fish_seen_subcommand_from update' -l yes -d 'Atualiza sem pedir confirmação'
 complete -c konen -n '__fish_seen_subcommand_from update' -l pre -d 'Inclui prereleases do Konen'

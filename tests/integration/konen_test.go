@@ -323,6 +323,7 @@ esac
 	assertContains(t, completion, "__complete projects")
 	assertContains(t, completion, "dotfile")
 	assertContains(t, completion, "installer")
+	assertContains(t, completion, "migrate")
 	assertContains(t, completion, "--state")
 	assertContains(t, completion, "ready pending missing different unknown")
 
@@ -360,6 +361,44 @@ hold = true
 	if got := runCommand(t, root, environment, konen, "__complete", "projects"); got != "sample\n" {
 		t.Fatalf("dynamic completion = %q, want %q", got, "sample\\n")
 	}
+
+	configPath := filepath.Join(configDir, "konen", "config.toml")
+	for _, path := range []string{configPath, manifestPath} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		legacy := strings.Replace(string(data), "version = 1\n", "", 1)
+		if err := os.WriteFile(path, []byte(legacy), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if output, err := runCommandError(root, environment, konen, "doctor"); err == nil {
+		t.Fatalf("doctor accepted legacy formats:\n%s", output)
+	} else {
+		assertContains(t, output, "konen migrate --dry-run")
+	}
+	configDigest := fileDigest(t, configPath)
+	projectDigest := fileDigest(t, manifestPath)
+	output = runCommand(t, root, environment, konen, "migrate", "--dry-run")
+	for _, fragment := range []string{"migrar v0 → v1", "+version = 1", "Nenhum arquivo foi alterado"} {
+		assertContains(t, output, fragment)
+	}
+	if fileDigest(t, configPath) != configDigest || fileDigest(t, manifestPath) != projectDigest {
+		t.Fatal("migration dry run changed a portable format")
+	}
+	output = runCommand(t, root, environment, konen, "migrate", "--yes")
+	assertContains(t, output, "Migração concluída: 2 arquivo(s)")
+	assertContains(t, output, "konen project trust sample")
+	if backups, err := filepath.Glob(filepath.Join(configDir, "konen", "migration-backups", "*")); err != nil || len(backups) != 1 {
+		t.Fatalf("migration backups = %v, %v", backups, err)
+	}
+	output = runCommand(t, root, environment, konen, "projects")
+	assertContains(t, output, "revisão necessária")
+	output = runCommand(t, root, environment, konen, "project", "trust", "sample")
+	assertContains(t, output, "Projeto aprovado: sample")
+	output = runCommand(t, root, environment, konen, "doctor")
+	assertContains(t, output, "✓ formatos: configuração e projetos compatíveis")
 
 	logData, err := os.ReadFile(miseLog)
 	if err != nil {

@@ -75,6 +75,12 @@ Edit it through the guided form with `konen project edit NAME`. `show`, `list`
 and `--dry-run` are non-mutating inspection commands. The list and dry-run
 output also report whether each local approval is valid or needs review.
 
+The integer `version` belongs to this Konen-specific manifest, not to the
+project's source code. When the format evolves, `konen migrate --dry-run`
+shows the proposed manifest diff and `konen migrate` creates a local backup
+before replacing it. A newer, unsupported version is never rewritten. Every
+migrated manifest requires a fresh project approval.
+
 ## Trust
 
 Project manifests contain executable commands. Approval is therefore local and

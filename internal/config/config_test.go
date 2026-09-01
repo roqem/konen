@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -49,7 +50,43 @@ func TestLoadRejectsUnsupportedVersion(t *testing.T) {
 	if err := os.WriteFile(path, []byte("version = 99\nstate_dir = '/tmp/state'\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Load(path); err == nil {
-		t.Fatal("Load() should reject an unsupported version")
+	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "konen update") {
+		t.Fatalf("Load() error = %v, want update guidance", err)
+	}
+}
+
+func TestPlanMigrationAddsVersionToLegacyConfigWithoutChangingItsState(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	legacy := []byte("# configuração antiga\nstate_dir = '/tmp/state'\n")
+	if err := os.WriteFile(path, legacy, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := PlanMigration(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.Needed() || plan.FromVersion != 0 || plan.ToVersion != 1 {
+		t.Fatalf("migration = %#v", plan)
+	}
+	if !strings.HasPrefix(string(plan.After), "version = 1\n") || plan.Config.StateDir != "/tmp/state" {
+		t.Fatalf("migrated config = %q, value = %#v", plan.After, plan.Config)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(legacy) {
+		t.Fatalf("planning changed the config: %q", got)
+	}
+}
+
+func TestLoadGuidesLegacyConfigToExplicitMigration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("state_dir = '/tmp/state'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "konen migrate --dry-run") {
+		t.Fatalf("Load() error = %v, want migration guidance", err)
 	}
 }

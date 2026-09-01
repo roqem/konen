@@ -3,6 +3,7 @@ package project
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -70,6 +71,15 @@ func TestTrustChangesWithManifest(t *testing.T) {
 	if trusted, err := trust.IsTrusted(manifestPath); err != nil || trusted {
 		t.Fatalf("changed IsTrusted() = %v, %v", trusted, err)
 	}
+	if err := trust.Trust(manifestPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := trust.Revoke(manifestPath); err != nil {
+		t.Fatal(err)
+	}
+	if trusted, err := trust.IsTrusted(manifestPath); err != nil || trusted {
+		t.Fatalf("revoked IsTrusted() = %v, %v", trusted, err)
+	}
 }
 
 func TestPortablePath(t *testing.T) {
@@ -92,5 +102,55 @@ func TestKeepInvokingTabDefaultsToTrue(t *testing.T) {
 	manifest.KeepInvokingTab = &keep
 	if manifest.KeepsInvokingTab() {
 		t.Fatal("explicit false should close the caller")
+	}
+}
+
+func TestPlanMigrationAddsVersionToLegacyProjectWithoutChangingIt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sample.toml")
+	legacy := []byte("path = '~/sample'\n\n[[tabs]]\ntitle = 'Terminal'\n")
+	if err := os.WriteFile(path, legacy, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := PlanMigration(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.Needed() || plan.FromVersion != 0 || plan.ToVersion != 1 {
+		t.Fatalf("migration = %#v", plan)
+	}
+	if !strings.HasPrefix(string(plan.After), "version = 1\n") || plan.Manifest.Path != "~/sample" {
+		t.Fatalf("migrated project = %q, value = %#v", plan.After, plan.Manifest)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(legacy) {
+		t.Fatalf("planning changed the project: %q", got)
+	}
+}
+
+func TestStoreLoadExplainsOldAndFutureProjectVersions(t *testing.T) {
+	root := t.TempDir()
+	store := Store{StateDir: root, HomeDir: root}
+	projectsDir := filepath.Join(root, "projects")
+	if err := os.MkdirAll(projectsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(projectsDir, "sample.toml")
+	legacy := "path = '~/sample'\n[[tabs]]\ntitle = 'Terminal'\n"
+	if err := os.WriteFile(path, []byte(legacy), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.Load("sample"); err == nil || !strings.Contains(err.Error(), "konen migrate --dry-run") {
+		t.Fatalf("legacy Load() error = %v", err)
+	}
+	future := "version = 99\n" + legacy
+	if err := os.WriteFile(path, []byte(future), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.Load("sample"); err == nil || !strings.Contains(err.Error(), "konen update") {
+		t.Fatalf("future Load() error = %v", err)
 	}
 }

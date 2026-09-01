@@ -113,6 +113,7 @@ func (p HuhPrompter) Menu(configured bool) (string, error) {
 		huh.NewOption(CommandLabel("apply", "aplicar etapas escolhidas", 13), "__apply_select"),
 		huh.NewOption(CommandLabel("dev", "abrir um projeto", 13), "dev"),
 		huh.NewOption(CommandLabel("status", "ver tudo configurado", 13), "status"),
+		huh.NewOption(CommandLabel("migrate", "revisar formatos antigos", 13), "migrate"),
 		huh.NewOption(CommandLabel("update", "revisar atualizações", 13), "update"),
 		huh.NewOption(CommandLabel("tool add", "adicionar uma ferramenta", 13), "__tool_add"),
 		huh.NewOption(CommandLabel("package add", "adicionar um pacote do sistema", 13), "__package_add"),
@@ -127,6 +128,7 @@ func (p HuhPrompter) Menu(configured bool) (string, error) {
 	if !configured {
 		options = []huh.Option[string]{
 			huh.NewOption(CommandLabel("init", "configurar o Konen", 8), "init"),
+			huh.NewOption(CommandLabel("migrate", "revisar formatos antigos", 8), "migrate"),
 			huh.NewOption(CommandLabel("update", "revisar atualizações", 8), "update"),
 			huh.NewOption(CommandLabel("doctor", "diagnosticar problemas", 8), "doctor"),
 			huh.NewOption(CommandLabel("q", "sair", 8), "__exit"),

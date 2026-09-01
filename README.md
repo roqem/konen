@@ -35,7 +35,7 @@ selecionadas automaticamente:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.16 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.17 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -613,6 +613,8 @@ aprovação local separada; uma edição ou pull exige
 | `konen apply --select` | Escolhe por checkboxes quais etapas serão aplicadas. |
 | `konen apply --only tools,dotfiles` | Aplica somente as etapas informadas. |
 | `konen apply --yes` | Aplica sem perguntas; use somente depois de revisar o plano. |
+| `konen migrate --dry-run` | Mostra mudanças necessárias nos formatos do Konen. |
+| `konen migrate [--yes]` | Migra formatos antigos depois da revisão. |
 | `konen update --dry-run` | Mostra versões e mecanismos sem atualizar. |
 | `konen update [--yes]` | Atualiza componentes próprios após revisão. |
 | `konen trust` | Aprova localmente o estado executável que você revisou. |
@@ -656,6 +658,38 @@ konen completion fish > ~/.config/fish/completions/konen.fish
 ```
 
 O autocomplete inclui comandos, opções, caminhos e nomes de projetos.
+
+## Compatibilidade e migrações
+
+O Konen versiona somente os formatos que ele próprio define: a configuração
+local e os manifestos em `projects/`. `mise.toml`, tarefas, comandos pessoais e
+dotfiles continuam nos formatos de suas ferramentas e não recebem uma versão
+paralela do Konen.
+
+Uma versão antiga é detectada antes do uso. Revise todas as mudanças sem gravar:
+
+```console
+konen migrate --dry-run
+```
+
+A tabela mostra a versão encontrada e a suportada, seguida pelo diff de cada
+arquivo. Para aplicar depois da revisão:
+
+```console
+konen migrate
+# ou, em automações:
+konen migrate --yes
+```
+
+Antes de alterar qualquer arquivo, o Konen confirma que nada mudou durante a
+revisão e guarda os originais em `~/.config/konen/migration-backups/` — ou no
+diretório equivalente sob `XDG_CONFIG_HOME`. As gravações são atômicas; uma
+falha restaura os arquivos já alterados. Manifestos migrados perdem a aprovação
+local e precisam de um novo `konen project trust NOME`.
+
+Se um arquivo tiver sido criado por uma versão mais nova do Konen, ele não é
+alterado: atualize o programa primeiro. Arquivos locais de aprovação são caches
+regeneráveis e não fazem parte do estado portável.
 
 ## Atualizando o Konen e o mise
 

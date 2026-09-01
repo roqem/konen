@@ -11,6 +11,7 @@ import (
 	"unicode"
 
 	"github.com/pelletier/go-toml/v2"
+	"github.com/roqem/konen/internal/compat"
 )
 
 const manifestVersion = 1
@@ -33,6 +34,18 @@ type Named struct {
 	Name     string
 	Path     string
 	Manifest Manifest
+}
+
+type Migration struct {
+	FromVersion int
+	ToVersion   int
+	Before      []byte
+	After       []byte
+	Manifest    Manifest
+}
+
+func (m Migration) Needed() bool {
+	return m.FromVersion != m.ToVersion
 }
 
 type Store struct {
@@ -80,14 +93,84 @@ func (s Store) Load(name string) (Manifest, string, error) {
 		return Manifest{}, path, err
 	}
 
+	manifest, err := Decode(data, path)
+	return manifest, path, err
+}
+
+func Decode(data []byte, path string) (Manifest, error) {
+	version, _, err := compat.TOMLVersion(data)
+	if err != nil {
+		return Manifest{}, fmt.Errorf("projeto inválido em %s: %w", path, err)
+	}
+	if version != manifestVersion {
+		return Manifest{}, fmt.Errorf("projeto incompatível em %s: %w", path, compat.VersionError{
+			Format: "o manifesto de projeto", Found: version, Current: manifestVersion,
+			Migratable: version == 0,
+		})
+	}
+	return decodeCurrent(data, path)
+}
+
+func PlanMigration(path string) (Migration, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Migration{}, err
+	}
+	version, present, err := compat.TOMLVersion(data)
+	if err != nil {
+		return Migration{}, fmt.Errorf("projeto inválido em %s: %w", path, err)
+	}
+	if version < 0 || version > manifestVersion {
+		return Migration{}, fmt.Errorf("projeto incompatível em %s: %w", path, compat.VersionError{Format: "o manifesto de projeto", Found: version, Current: manifestVersion})
+	}
+	after := append([]byte(nil), data...)
+	for next := version; next < manifestVersion; next++ {
+		switch next {
+		case 0:
+			after, err = migrateZeroToOne(after, present)
+		default:
+			return Migration{}, fmt.Errorf("projeto incompatível em %s: %w", path, compat.VersionError{Format: "o manifesto de projeto", Found: next, Current: manifestVersion})
+		}
+		if err != nil {
+			return Migration{}, fmt.Errorf("não foi possível migrar o projeto em %s: %w", path, err)
+		}
+		present = true
+	}
+	manifest, err := decodeCurrent(after, path)
+	if err != nil {
+		return Migration{}, err
+	}
+	return Migration{
+		FromVersion: version, ToVersion: manifestVersion,
+		Before: append([]byte(nil), data...), After: after, Manifest: manifest,
+	}, nil
+}
+
+func decodeCurrent(data []byte, path string) (Manifest, error) {
 	var manifest Manifest
 	if err := toml.Unmarshal(data, &manifest); err != nil {
-		return Manifest{}, path, fmt.Errorf("projeto inválido em %s: %w", path, err)
+		return Manifest{}, fmt.Errorf("projeto inválido em %s: %w", path, err)
 	}
 	if err := Validate(manifest); err != nil {
-		return Manifest{}, path, fmt.Errorf("projeto inválido em %s: %w", path, err)
+		return Manifest{}, fmt.Errorf("projeto inválido em %s: %w", path, err)
 	}
-	return manifest, path, nil
+	return manifest, nil
+}
+
+func migrateZeroToOne(data []byte, versionPresent bool) ([]byte, error) {
+	if !versionPresent {
+		return append([]byte("version = 1\n"), data...), nil
+	}
+	var document map[string]any
+	if err := toml.Unmarshal(data, &document); err != nil {
+		return nil, err
+	}
+	document["version"] = int64(1)
+	updated, err := toml.Marshal(document)
+	if err != nil {
+		return nil, err
+	}
+	return updated, nil
 }
 
 func (s Store) Save(name string, manifest Manifest) (string, error) {
