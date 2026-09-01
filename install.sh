@@ -24,8 +24,10 @@ require_command() {
 download() {
   source_url=$1
   destination=$2
-  curl -fL --retry 3 --retry-delay 1 --connect-timeout 15 \
-    "$source_url" -o "$destination"
+  if ! curl -fL --retry 3 --retry-delay 1 --connect-timeout 15 \
+    "$source_url" -o "$destination"; then
+    fail "não foi possível baixar $source_url"
+  fi
 }
 
 checksum_for() {

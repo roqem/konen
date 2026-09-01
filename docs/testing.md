@@ -13,9 +13,11 @@ Linux integration journeys:
 
 - the installer downloads real archives from an isolated local HTTP server,
   installs Konen and mise into a temporary home, upgrades Konen without losing
-  state, rejects a corrupted archive and proves that `sudo` was not invoked;
+  state, rejects a corrupted archive, survives a truncated network response and
+  proves that `sudo` was not invoked;
   the installed older binary then plans and performs its own checksum-verified
-  update to a third release without changing the state;
+  update to a third release without changing the state, and an interrupted
+  fourth download preserves both working executables and leaves no staged file;
 - a built Konen executable runs `init --git`, `doctor`, `status`, `plan`,
   `apply --dry-run`, a real apply against a stateful fake backend, completion
   generation and the project inspection/trust workflow with temporary

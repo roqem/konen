@@ -147,6 +147,33 @@ func TestInstallerInstallsUpdatesAndRejectsCorruption(t *testing.T) {
 	if data, err := os.ReadFile(stateMarker); err != nil || string(data) != "preserved\n" {
 		t.Fatalf("self-update changed state: data=%q error=%v", data, err)
 	}
+
+	workingKonenDigest := fileDigest(t, installedKonen)
+	workingMiseDigest := fileDigest(t, installedMise)
+	interruptedVersion := "0.1.0-test.4"
+	interrupted := newInterruptedReleaseServer(t, interruptedVersion)
+	defer interrupted.Close()
+	interruptedEnvironment := replaceEnvironment(environment, map[string]string{
+		"KONEN_RELEASE_API_URL":  interrupted.URL + "/konen-api",
+		"KONEN_RELEASE_BASE_URL": interrupted.URL + "/releases",
+		"KONEN_VERSION":          interruptedVersion,
+	})
+
+	failedOutput, err = runCommandError(repository, interruptedEnvironment, "/bin/sh", installScript)
+	if err == nil {
+		t.Fatal("installer accepted an interrupted release download")
+	}
+	assertContains(t, failedOutput, "não foi possível baixar")
+	assertWorkingInstallationPreserved(t, installedKonen, installedMise, stateMarker, workingKonenDigest, workingMiseDigest)
+	assertNoMatches(t, filepath.Join(tempDir, "konen-install.*"))
+
+	failedOutput, err = runCommandError(root, interruptedEnvironment, installedKonen, "update", "--yes", "--only", "konen")
+	if err == nil {
+		t.Fatal("self-update accepted an interrupted release download")
+	}
+	assertContains(t, failedOutput, "não foi possível baixar")
+	assertWorkingInstallationPreserved(t, installedKonen, installedMise, stateMarker, workingKonenDigest, workingMiseDigest)
+	assertNoMatches(t, filepath.Join(filepath.Dir(installedKonen), ".konen-update-*.tmp"))
 }
 
 func TestFirstRunJourneyThroughBuiltExecutable(t *testing.T) {
@@ -495,6 +522,19 @@ func newReleaseServer(t *testing.T, root string, latest *latestRelease) *httptes
 	}))
 }
 
+func newInterruptedReleaseServer(t *testing.T, version string) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/konen-api" {
+			fmt.Fprintf(response, `[{"tag_name":"v%s","prerelease":true}]`, version)
+			return
+		}
+		response.Header().Set("Content-Length", "4096")
+		response.WriteHeader(http.StatusOK)
+		_, _ = response.Write([]byte("download interrupted"))
+	}))
+}
+
 func createKonenRelease(t *testing.T, root, version, architecture string) string {
 	t.Helper()
 	repository := repositoryRoot(t)
@@ -629,6 +669,30 @@ func fileDigest(t *testing.T, path string) string {
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
+func assertWorkingInstallationPreserved(t *testing.T, konen, mise, stateMarker, konenDigest, miseDigest string) {
+	t.Helper()
+	if got := fileDigest(t, konen); got != konenDigest {
+		t.Fatal("interrupted download replaced the working Konen executable")
+	}
+	if got := fileDigest(t, mise); got != miseDigest {
+		t.Fatal("interrupted download replaced the working mise executable")
+	}
+	if data, err := os.ReadFile(stateMarker); err != nil || string(data) != "preserved\n" {
+		t.Fatalf("interrupted download changed state: data=%q error=%v", data, err)
+	}
+}
+
+func assertNoMatches(t *testing.T, pattern string) {
+	t.Helper()
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("temporary files remain after interrupted download: %v", matches)
+	}
+}
+
 func assertExecutable(t *testing.T, path string) {
 	t.Helper()
 	info, err := os.Stat(path)
@@ -669,6 +733,24 @@ func testEnvironment(overrides map[string]string) []string {
 		}
 	}
 	for key, value := range overrides {
+		values[key] = value
+	}
+	result := make([]string, 0, len(values))
+	for key, value := range values {
+		result = append(result, key+"="+value)
+	}
+	return result
+}
+
+func replaceEnvironment(environment []string, replacements map[string]string) []string {
+	values := make(map[string]string, len(environment)+len(replacements))
+	for _, entry := range environment {
+		key, value, ok := strings.Cut(entry, "=")
+		if ok {
+			values[key] = value
+		}
+	}
+	for key, value := range replacements {
 		values[key] = value
 	}
 	result := make([]string, 0, len(values))
