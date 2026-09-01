@@ -107,7 +107,7 @@ func (a *App) runPersonalInstallerAdd(ctx context.Context, args []string) error 
 	taskName := "install:" + answer.Name
 	afterConfig, alreadySelected, err := state.AddTaskRunReference(beforeConfig, taskName)
 	if err != nil {
-		return fmt.Errorf("não foi possível selecionar o instalador no bootstrap: %w", err)
+		return fmt.Errorf("não foi possível incluir o instalador no fluxo de aplicação: %w", err)
 	}
 	configChanged := !bytes.Equal(beforeConfig, afterConfig)
 
@@ -119,13 +119,13 @@ func (a *App) runPersonalInstallerAdd(ctx context.Context, args []string) error 
 	fmt.Fprintln(a.options.Out, "Arquivo proposto:")
 	fmt.Fprint(a.options.Out, ui.RenderDiff(installerRelative, "", string(contents)))
 	if configChanged {
-		fmt.Fprintln(a.options.Out, "Seleção proposta no bootstrap sequencial:")
+		fmt.Fprintln(a.options.Out, "Inclusão proposta no fluxo de aplicação:")
 		fmt.Fprint(a.options.Out, ui.RenderDiff("mise.toml", string(beforeConfig), string(afterConfig)))
 	} else if alreadySelected {
-		fmt.Fprintf(a.options.Out, "Bootstrap: %s já estava selecionado.\n", taskName)
+		fmt.Fprintf(a.options.Out, "Aplicação: %s já estava incluído.\n", taskName)
 	}
 	if answer.Mode == "create" {
-		fmt.Fprintln(a.options.Out, "Atenção: o esqueleto termina com erro até ser implementado; assim o apply não pode fingir que instalou algo.")
+		fmt.Fprintln(a.options.Out, "Atenção: o esqueleto termina com erro até ser implementado; assim `konen apply` não pode indicar uma instalação inexistente.")
 	}
 	if *dryRun {
 		fmt.Fprintln(a.options.Out, "Nenhum arquivo foi gravado e nenhuma tarefa foi executada.")
@@ -171,7 +171,7 @@ func (a *App) runPersonalInstallerAdd(ctx context.Context, args []string) error 
 	}
 
 	fmt.Fprintf(a.options.Out, "Instalador pessoal adicionado: %s\n", installerRelative)
-	fmt.Fprintf(a.options.Out, "Bootstrap atualizado: %s será chamado por `konen apply`.\n", taskName)
+	fmt.Fprintf(a.options.Out, "`konen apply` agora executará %s.\n", taskName)
 	if answer.Mode == "create" {
 		fmt.Fprintf(a.options.Out, "Implemente %s e execute `konen trust` antes do próximo plano.\n", installerPath)
 	}

@@ -161,14 +161,14 @@ func renderApplySummary(summary applySummary) string {
 	}
 	if summary.taskRan {
 		rows = append(rows, []string{
-			"Tarefa bootstrap", "1",
-			"terminou sem erro; tarefas idempotentes não possuem estado convergente",
+			"Etapa de tarefas pessoais", "1",
+			"terminou sem erro; tarefas idempotentes não têm um estado final verificável",
 		})
 	}
 
 	var output strings.Builder
 	output.WriteByte('\n')
-	output.WriteString(ui.RenderTable([]string{"Resumo do apply", "Itens", "Detalhes"}, rows))
+	output.WriteString(ui.RenderTable([]string{"Resumo da aplicação", "Itens", "Detalhes"}, rows))
 
 	var next [][]string
 	if len(summary.pendingAll) > 0 {

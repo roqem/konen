@@ -306,18 +306,18 @@ func (a *App) runApply(ctx context.Context, args []string) error {
 
 	trusted, trustErr := a.stateTrust().IsTrusted(stateDir)
 	if trustErr != nil {
-		fmt.Fprintln(a.options.Out, "\nApply concluído, mas a aprovação local não pôde ser validada depois da aplicação.")
-		fmt.Fprintln(a.options.Out, "Execute `konen doctor` antes de uma nova operação; o resumo pós-apply não invocou o mise novamente.")
+		fmt.Fprintln(a.options.Out, "\nA aplicação terminou, mas não foi possível validar a aprovação local em seguida.")
+		fmt.Fprintln(a.options.Out, "Execute `konen doctor` antes de uma nova operação. Por segurança, o Konen não consultou o mise novamente para criar o resumo.")
 		return nil
 	}
 	if !trusted {
-		fmt.Fprintln(a.options.Out, "\nApply concluído, mas o estado executável mudou durante a aplicação.")
-		fmt.Fprintln(a.options.Out, "Revise as mudanças e execute `konen trust`; o resumo pós-apply não invocou o mise novamente.")
+		fmt.Fprintln(a.options.Out, "\nA aplicação terminou, mas o mise.toml, uma tarefa ou um comando pessoal mudou durante a execução.")
+		fmt.Fprintln(a.options.Out, "Revise as mudanças e execute `konen trust`. Por segurança, o Konen não consultou o mise novamente para criar o resumo.")
 		return nil
 	}
 	after, afterErr := a.queryMiseStatusRows(ctx, stateDir, misePath)
 	if beforeErr != nil || afterErr != nil {
-		fmt.Fprintln(a.options.Out, "\nApply concluído, mas o resumo estruturado não pôde ser gerado.")
+		fmt.Fprintln(a.options.Out, "\nA aplicação terminou, mas não foi possível criar o resumo.")
 		fmt.Fprintln(a.options.Out, "Execute `konen status` para conferir o estado atual.")
 		return nil
 	}
@@ -479,7 +479,7 @@ func (a *App) runTrust(ctx context.Context, args []string) error {
 		return errors.New("mise não está instalado; consulte https://mise.jdx.dev/installing-mise.html")
 	}
 	if _, _, _, err := state.ExecutionDigest(stateDir); err != nil {
-		return fmt.Errorf("a superfície executável do estado não pode ser aprovada: %w", err)
+		return fmt.Errorf("os arquivos executáveis do estado não podem ser aprovados: %w", err)
 	}
 	miseConfig := filepath.Join(stateDir, "mise.toml")
 	if err := a.options.Runner.Run(ctx, stateDir, misePath, "trust", miseConfig); err != nil {
@@ -490,7 +490,7 @@ func (a *App) runTrust(ctx context.Context, args []string) error {
 		return fmt.Errorf("não foi possível registrar a aprovação local: %w", err)
 	}
 	fmt.Fprintf(a.options.Out, "Estado confiado: %s\n", miseConfig)
-	fmt.Fprintf(a.options.Out, "Superfície executável aprovada: %d arquivo(s).\n", len(files))
+	fmt.Fprintf(a.options.Out, "Arquivos revisados e aprovados: %d.\n", len(files))
 	for _, file := range files {
 		fmt.Fprintf(a.options.Out, "  %s\n", file)
 	}
@@ -514,7 +514,12 @@ func (a *App) runDoctor(ctx context.Context) error {
 			fmt.Fprintf(a.options.Out, "✗ formatos: %v\n", migrationErr)
 			healthy = false
 		case len(migrationPlan.pending()) > 0:
-			fmt.Fprintf(a.options.Out, "✗ formatos: %d migração(ões) pendente(s); execute `konen migrate --dry-run`\n", len(migrationPlan.pending()))
+			count := len(migrationPlan.pending())
+			label := "migrações pendentes"
+			if count == 1 {
+				label = "migração pendente"
+			}
+			fmt.Fprintf(a.options.Out, "✗ formatos: %d %s; execute `konen migrate --dry-run`\n", count, label)
 			healthy = false
 		default:
 			fmt.Fprintln(a.options.Out, "✓ formatos: configuração e projetos compatíveis")
@@ -525,7 +530,7 @@ func (a *App) runDoctor(ctx context.Context) error {
 			fmt.Fprintf(a.options.Out, "✗ confiança: %v\n", trustErr)
 			healthy = false
 		case trusted:
-			fmt.Fprintln(a.options.Out, "✓ confiança: superfície executável aprovada")
+			fmt.Fprintln(a.options.Out, "✓ confiança: mise.toml, tarefas e comandos aprovados")
 		default:
 			fmt.Fprintln(a.options.Out, "· confiança: revisão necessária; execute `konen trust`")
 		}
@@ -649,7 +654,7 @@ func (a *App) printHelp() {
 		{"konen plan --only ETAPAS", "mostra somente etapas separadas por vírgula"},
 		{"konen apply [--select]", "aplica o estado completo ou escolhe etapas"},
 		{"konen apply --only ETAPAS", "aplica somente etapas separadas por vírgula"},
-		{"konen trust", "confia no mise.toml após revisão"},
+		{"konen trust", "aprova mise.toml, tarefas e comandos após revisão"},
 		{"konen doctor", "diagnostica a instalação"},
 		{"konen migrate [--dry-run]", "revisa e aplica migrações dos formatos do Konen"},
 		{"konen update [--dry-run]", "mostra versões e atualiza Konen e mise após confirmação"},
@@ -666,7 +671,7 @@ func (a *App) printHelp() {
 		{"konen command add --dry-run [--from ARQUIVO] [NOME]", "mostra o executável sem gravar"},
 		{"konen installer add [NOME]", "cria e seleciona um instalador pessoal"},
 		{"konen installer add --from ARQUIVO [NOME]", "importa e seleciona um instalador"},
-		{"konen installer add --dry-run [--from ARQUIVO] [NOME]", "mostra o instalador e o bootstrap sem gravar"},
+		{"konen installer add --dry-run [--from ARQUIVO] [NOME]", "mostra o instalador e sua inclusão na aplicação sem gravar"},
 		{"konen dotfile add CAMINHO...", "adiciona dotfiles ao estado"},
 		{"konen dotfile add --mode MODO CAMINHO...", "usa symlink, copy ou template"},
 		{"konen diff", "mostra diferenças dos dotfiles"},
@@ -677,7 +682,7 @@ func (a *App) printHelp() {
 		{"konen project edit NOME", "edita um projeto pelo assistente"},
 		{"konen project show NOME", "mostra o manifesto de um projeto"},
 		{"konen project trust NOME", "aprova os comandos após revisão"},
-		{"konen project run NOME AÇÃO", "executa uma ação nomeada pelo mise"},
+		{"konen project run NOME AÇÃO", "executa uma ação usando uma tarefa do mise"},
 		{"konen dev [NOME] [--dry-run]", "abre ou inspeciona a sessão do projeto"},
 	})
 	a.printCommandGroup("Shell", [][2]string{

@@ -335,7 +335,7 @@ func (p HuhPrompter) PersonalInstaller(answer PersonalInstallerAnswer) (Personal
 	mode := huh.NewForm(huh.NewGroup(
 		huh.NewSelect[string]().
 			Title("Como deseja adicionar o instalador?").
-			Description("Ele será revisado agora e chamado futuramente pelo bootstrap.").
+			Description("Ele será revisado agora e executado por `konen apply` depois de adicionado.").
 			Options(
 				huh.NewOption("Criar um esqueleto sem comandos de instalação", "create"),
 				huh.NewOption("Importar um arquivo existente", "import"),

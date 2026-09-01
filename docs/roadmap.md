@@ -79,9 +79,9 @@ Objetivo: estabilizar o contrato antes de ampliar distribuição e integrações
 - [x] automatizar um smoke test público em ambiente Linux descartável;
 - manter a qualificação manual com um estado privado representativo;
 - [x] testar instalação, atualização, interrupção de rede e reaplicação;
-- revisar mensagens e documentação com linguagem direta e natural;
-- documentar plataformas suportadas e limites conhecidos;
-- definir política de compatibilidade e migração de versões;
+- [x] revisar mensagens e documentação com linguagem direta e natural;
+- [x] documentar plataformas suportadas e limites conhecidos;
+- [x] definir política de compatibilidade e migração de versões;
 - publicar a primeira beta somente quando um estado criado numa alpha puder ser
   atualizado sem reconstrução manual.
 

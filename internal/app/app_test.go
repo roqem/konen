@@ -224,7 +224,7 @@ func TestInitAndApply(t *testing.T) {
 	if !strings.Contains(out.String(), "O Konen não cria commits") {
 		t.Fatalf("init output does not explain Git ownership: %q", out.String())
 	}
-	for _, fragment := range []string{"Resumo do apply", "Convergiram nesta execução", "Ferramenta: 1"} {
+	for _, fragment := range []string{"Resumo da aplicação", "Convergiram nesta execução", "Ferramenta: 1"} {
 		if !strings.Contains(out.String(), fragment) {
 			t.Fatalf("apply output is missing %q: %s", fragment, out.String())
 		}
@@ -691,7 +691,7 @@ func TestExistingStateNeedsExplicitTrust(t *testing.T) {
 	if len(runner.runs) != 1 || !reflect.DeepEqual(runner.runs[0], want) {
 		t.Fatalf("runs = %#v, want %#v", runner.runs, want)
 	}
-	for _, fragment := range []string{"Superfície executável aprovada", "mise.toml"} {
+	for _, fragment := range []string{"Arquivos revisados e aprovados", "mise.toml"} {
 		assertOutputContains(t, out.String(), fragment)
 	}
 }

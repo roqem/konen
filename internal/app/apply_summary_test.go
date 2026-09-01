@@ -31,8 +31,8 @@ func TestBuildApplySummaryDistinguishesConvergencePendingAndTasks(t *testing.T) 
 	}
 	got := renderApplySummary(summary)
 	for _, fragment := range []string{
-		"Resumo do apply", "Convergiram nesta execução", "3", "Já estavam prontos",
-		"Ainda pendentes nas etapas aplicadas", "Tarefa bootstrap",
+		"Resumo da aplicação", "Convergiram nesta execução", "3", "Já estavam prontos",
+		"Ainda pendentes nas etapas aplicadas", "Etapa de tarefas pessoais",
 		"Recursos pendentes", "Nova sessão de login", "Mensagens das tarefas",
 	} {
 		if !strings.Contains(got, fragment) {
@@ -86,7 +86,7 @@ func TestApplyDoesNotInspectMiseAgainWhenExecutableStateChanges(t *testing.T) {
 	if len(runner.runs) != 2 {
 		t.Fatalf("changed executable state was inspected after apply: %#v", runner.runs)
 	}
-	for _, fragment := range []string{"estado executável mudou", "konen trust", "não invocou o mise novamente"} {
+	for _, fragment := range []string{"uma tarefa ou um comando pessoal mudou", "konen trust", "não consultou o mise novamente"} {
 		if !strings.Contains(out.String(), fragment) {
 			t.Fatalf("changed-state guidance is missing %q: %s", fragment, out.String())
 		}
@@ -117,7 +117,7 @@ func TestApplyCompletesWhenStructuredSummaryIsUnavailable(t *testing.T) {
 	if len(runner.runs) != 3 {
 		t.Fatalf("apply did not attempt before/apply/after in order: %#v", runner.runs)
 	}
-	if !strings.Contains(out.String(), "Apply concluído") || !strings.Contains(out.String(), "konen status") {
+	if !strings.Contains(out.String(), "A aplicação terminou") || !strings.Contains(out.String(), "konen status") {
 		t.Fatalf("unavailable summary output = %s", out.String())
 	}
 }
@@ -153,7 +153,7 @@ func TestFailedApplyDoesNotClaimSuccessOrQueryPostStatus(t *testing.T) {
 	if len(runner.runs) != 2 {
 		t.Fatalf("failed apply queried post status: %#v", runner.runs)
 	}
-	if strings.Contains(out.String(), "Resumo do apply") || strings.Contains(out.String(), "Apply concluído") {
+	if strings.Contains(out.String(), "Resumo da aplicação") || strings.Contains(out.String(), "A aplicação terminou") {
 		t.Fatalf("failed apply claimed success: %s", out.String())
 	}
 }

@@ -22,6 +22,8 @@ Konen está em **alpha**: o fluxo completo já foi validado em uma VM Ubuntu
 estável. A versão mínima do mise aceita pelo contrato atual é 2026.8.15.
 
 Os próximos marcos estão em [docs/roadmap.md](docs/roadmap.md).
+Plataformas qualificadas, limites conhecidos e a política de migração estão em
+[docs/support.md](docs/support.md).
 
 Konen não é outro gerenciador de pacotes. Ele cuida da experiência inicial,
 segurança, diagnóstico e sessões de projetos; mise continua sendo a fonte da
@@ -263,6 +265,10 @@ Os checkboxes trabalham por etapa — pacotes, repositórios, dotfiles,
 ferramentas e tarefas pessoais — para preservar as dependências internas de
 cada grupo. O mesmo seletor pode iniciar uma aplicação parcial:
 
+O mise chama esse conjunto ordenado de etapas de *bootstrap*. Você verá esse
+nome no `mise.toml` e na saída original do mise; no Konen, ele corresponde ao
+plano e à aplicação do estado.
+
 ```console
 konen apply --select
 ```
@@ -279,7 +285,7 @@ Durante essas operações, o Konen limita o mise ao estado atualmente
 configurado. Uma configuração global anterior ou arquivos de versão encontrados
 em pastas ancestrais não são misturados ao plano.
 
-Depois de um `apply` bem-sucedido, o Konen consulta o estado estruturado antes e
+Depois de um `apply` bem-sucedido, o Konen consulta o estado antes e
 depois da aplicação e resume:
 
 - quais recursos convergiram naquela execução;
@@ -289,10 +295,11 @@ depois da aplicação e resume:
   idempotente possui estado convergente;
 - ações observáveis, como iniciar uma nova sessão após mudar o shell de login.
 
-Instaladores pessoais continuam responsáveis por imprimir instruções próprias,
+Instaladores pessoais continuam responsáveis por mostrar instruções próprias,
 como autenticação ou reinício. O resumo manda revisar essas mensagens. Se uma
-tarefa alterar a superfície executável do estado durante o `apply`, o Konen não
-faz a consulta posterior: exige nova revisão com `konen trust`.
+tarefa alterar o `mise.toml`, outra tarefa ou um comando pessoal durante o
+`apply`, o Konen não faz a consulta posterior: exige nova revisão com
+`konen trust`.
 
 ### Pacotes do sistema
 
@@ -622,7 +629,7 @@ também respeita a confiança do mise. Veja [docs/projects.md](docs/projects.md)
 | `konen migrate [--yes]` | Migra formatos antigos depois da revisão. |
 | `konen update --dry-run` | Mostra versões e mecanismos sem atualizar. |
 | `konen update [--yes]` | Atualiza componentes próprios após revisão. |
-| `konen trust` | Aprova localmente o estado executável que você revisou. |
+| `konen trust` | Aprova localmente o mise.toml, as tarefas e os comandos revisados. |
 | `konen tool add [NOME] [VERSÃO]` | Adiciona uma ferramenta ao estado mostrando o diff. |
 | `konen package add [--manager M] PACOTE [VERSÃO]` | Adiciona um pacote do sistema sem instalá-lo. |
 | `konen repo add DESTINO URL [REF]` | Adiciona um checkout Git sem cloná-lo. |
@@ -747,7 +754,7 @@ ele. O repositório de estado, seus dotfiles e projetos não são alterados.
 Konen calcula um digest do `mise.toml`, de todos os diretórios de tarefas mise
 reconhecidos e de `scripts/bin`, incluindo as permissões executáveis. Qualquer
 mudança bloqueia operações respaldadas por mise até uma nova aprovação.
-Symlinks nessa superfície executável são recusados. Estados criados pelo Konen
+Links simbólicos nesses caminhos são recusados. Estados criados pelo Konen
 são aprovados localmente; estados clonados ou adotados de outro lugar não são.
 
 Mais detalhes estão em [docs/architecture.md](docs/architecture.md).

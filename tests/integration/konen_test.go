@@ -303,7 +303,7 @@ esac
 	}
 	output = runCommand(t, root, environment, konen, "apply", "--yes")
 	for _, fragment := range []string{
-		"fixture apply: changed go", "Resumo do apply", "Convergiram nesta execução",
+		"fixture apply: changed go", "Resumo da aplicação", "Convergiram nesta execução",
 		"Ferramenta: 1", "Estado declarativo", "convergido",
 	} {
 		assertContains(t, output, fragment)
@@ -326,7 +326,7 @@ esac
 	output = runCommand(t, root, environment, konen,
 		"installer", "add", "--dry-run", "--from", installerSource, "noop")
 	assertContains(t, output, "Instalador pessoal: noop")
-	assertContains(t, output, "Seleção proposta no bootstrap sequencial")
+	assertContains(t, output, "Inclusão proposta no fluxo de aplicação")
 	assertContains(t, output, "Nenhum arquivo foi gravado e nenhuma tarefa foi executada")
 	installerDestination := filepath.Join(stateDir, "mise-tasks", "install", "noop")
 	if _, err := os.Lstat(installerDestination); !os.IsNotExist(err) {
