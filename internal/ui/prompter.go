@@ -18,7 +18,13 @@ type InitAnswer struct {
 type ProjectTabAnswer struct {
 	Title   string
 	Command string
+	Action  string
 	Hold    bool
+}
+
+type ProjectActionAnswer struct {
+	Name string
+	Task string
 }
 
 type ProjectAnswer struct {
@@ -26,6 +32,7 @@ type ProjectAnswer struct {
 	Path            string
 	Shell           string
 	KeepInvokingTab bool
+	Actions         []ProjectActionAnswer
 	Tabs            []ProjectTabAnswer
 }
 
@@ -77,6 +84,7 @@ type Prompter interface {
 	Confirm(string) (bool, error)
 	Project(ProjectAnswer) (ProjectAnswer, error)
 	ChooseProject([]string) (string, error)
+	ChooseProjectAction(string, []string) (string, error)
 }
 
 type HuhPrompter struct {
@@ -112,6 +120,7 @@ func (p HuhPrompter) Menu(configured bool) (string, error) {
 		huh.NewOption(CommandLabel("plan", "revisar etapas escolhidas", 13), "__plan_select"),
 		huh.NewOption(CommandLabel("apply", "aplicar etapas escolhidas", 13), "__apply_select"),
 		huh.NewOption(CommandLabel("dev", "abrir um projeto", 13), "dev"),
+		huh.NewOption(CommandLabel("run", "executar uma ação de projeto", 13), "run"),
 		huh.NewOption(CommandLabel("status", "ver tudo configurado", 13), "status"),
 		huh.NewOption(CommandLabel("migrate", "revisar formatos antigos", 13), "migrate"),
 		huh.NewOption(CommandLabel("update", "revisar atualizações", 13), "update"),
@@ -422,14 +431,75 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 		return ProjectAnswer{}, err
 	}
 
+	actions := make([]ProjectActionAnswer, 0, len(answer.Actions)+1)
+	for index, existing := range answer.Actions {
+		keep := true
+		form := huh.NewForm(huh.NewGroup(
+			huh.NewInput().Title(fmt.Sprintf("Ação %d — nome", index+1)).Value(&existing.Name),
+			huh.NewInput().
+				Title("Tarefa do mise").
+				Description("Nome declarado pelo projeto, como test, dev ou db:console.").
+				Value(&existing.Task),
+			huh.NewConfirm().
+				Title("Manter esta ação?").
+				Affirmative("Sim").Negative("Remover").Value(&keep),
+		)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
+		if err := form.Run(); err != nil {
+			return ProjectAnswer{}, err
+		}
+		if keep {
+			existing.Name = strings.TrimSpace(existing.Name)
+			existing.Task = strings.TrimSpace(existing.Task)
+			actions = append(actions, existing)
+		}
+	}
+
+	addAction := false
+	form := huh.NewForm(huh.NewGroup(
+		huh.NewConfirm().
+			Title("Adicionar uma ação nomeada do projeto?").
+			Description("Ações reutilizam tarefas do mise em `konen run` e nas abas.").
+			Affirmative("Sim").Negative("Não").Value(&addAction),
+	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
+	if err := form.Run(); err != nil {
+		return ProjectAnswer{}, err
+	}
+	for addAction {
+		action := ProjectActionAnswer{}
+		addAction = false
+		form := huh.NewForm(huh.NewGroup(
+			huh.NewInput().
+				Title("Nome curto da ação").
+				Description("Exemplos: test, console ou coverage.").
+				Value(&action.Name),
+			huh.NewInput().
+				Title("Tarefa do mise").
+				Description("A tarefa continua definida no mise.toml do projeto.").
+				Value(&action.Task),
+			huh.NewConfirm().
+				Title("Adicionar outra ação?").
+				Affirmative("Sim").Negative("Não").Value(&addAction),
+		)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
+		if err := form.Run(); err != nil {
+			return ProjectAnswer{}, err
+		}
+		action.Name = strings.TrimSpace(action.Name)
+		action.Task = strings.TrimSpace(action.Task)
+		actions = append(actions, action)
+	}
+
 	tabs := make([]ProjectTabAnswer, 0, len(answer.Tabs)+1)
 	for index, existing := range answer.Tabs {
 		keep := true
-		form := huh.NewForm(huh.NewGroup(
+		fields := []huh.Field{
 			huh.NewInput().Title(fmt.Sprintf("Aba %d — título", index+1)).Value(&existing.Title),
 			huh.NewInput().
-				Title("Comando").
-				Description("Vazio abre apenas o shell do projeto.").
+				Title("Ação nomeada (opcional)").
+				Description("Use uma ação cadastrada acima; vazio permite um comando direto.").
+				Value(&existing.Action),
+			huh.NewInput().
+				Title("Comando direto (opcional)").
+				Description("Use somente se a ação estiver vazia; ambos vazios abrem o shell.").
 				Value(&existing.Command),
 			huh.NewConfirm().
 				Title("Manter aberta quando o comando terminar?").
@@ -437,13 +507,15 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 			huh.NewConfirm().
 				Title("Manter esta aba?").
 				Affirmative("Sim").Negative("Remover").Value(&keep),
-		)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
+		}
+		form := huh.NewForm(huh.NewGroup(fields...)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
 		if err := form.Run(); err != nil {
 			return ProjectAnswer{}, err
 		}
 		if keep {
 			existing.Title = strings.TrimSpace(existing.Title)
 			existing.Command = strings.TrimSpace(existing.Command)
+			existing.Action = strings.TrimSpace(existing.Action)
 			tabs = append(tabs, existing)
 		}
 	}
@@ -468,8 +540,12 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 		form := huh.NewForm(huh.NewGroup(
 			huh.NewInput().Title("Título da aba").Value(&tab.Title),
 			huh.NewInput().
-				Title("Comando").
-				Description("Vazio abre apenas o shell do projeto.").
+				Title("Ação nomeada (opcional)").
+				Description("Use uma ação cadastrada acima; vazio permite um comando direto.").
+				Value(&tab.Action),
+			huh.NewInput().
+				Title("Comando direto (opcional)").
+				Description("Use somente se a ação estiver vazia; ambos vazios abrem o shell.").
 				Value(&tab.Command),
 			huh.NewConfirm().
 				Title("Manter aberta quando o comando terminar?").
@@ -483,12 +559,14 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 		}
 		tab.Title = strings.TrimSpace(tab.Title)
 		tab.Command = strings.TrimSpace(tab.Command)
+		tab.Action = strings.TrimSpace(tab.Action)
 		tabs = append(tabs, tab)
 	}
 
 	answer.Name = strings.TrimSpace(answer.Name)
 	answer.Path = strings.TrimSpace(answer.Path)
 	answer.Shell = strings.TrimSpace(answer.Shell)
+	answer.Actions = actions
 	answer.Tabs = tabs
 	return answer, nil
 }
@@ -508,6 +586,24 @@ func (p HuhPrompter) ChooseProject(names []string) (string, error) {
 	var selected string
 	form := huh.NewForm(huh.NewGroup(
 		huh.NewSelect[string]().Title("Qual projeto deseja abrir?").Options(options...).Value(&selected),
+	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
+	return selected, form.Run()
+}
+
+func (p HuhPrompter) ChooseProjectAction(projectName string, names []string) (string, error) {
+	if len(names) == 0 {
+		return "", fmt.Errorf("o projeto %q não possui ações; edite-o com `konen project edit %s`", projectName, projectName)
+	}
+	options := make([]huh.Option[string], 0, len(names))
+	for _, name := range names {
+		options = append(options, huh.NewOption(name, name))
+	}
+	var selected string
+	form := huh.NewForm(huh.NewGroup(
+		huh.NewSelect[string]().
+			Title(fmt.Sprintf("Qual ação de %s deseja executar?", projectName)).
+			Options(options...).
+			Value(&selected),
 	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())
 	return selected, form.Run()
 }

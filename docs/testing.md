@@ -22,7 +22,9 @@ Linux integration journeys:
   configuration, state, home and backend binaries; the real apply must compare
   structured status and summarize the resource that changed; the same built
   executable must preview and migrate legacy local/project formats, preserve
-  dry-run bytes, create backups and invalidate project approval;
+  dry-run bytes, create backups and invalidate project approval; named actions
+  must remain inert during dry-run, require manifest approval and invoke the
+  selected native mise task from the registered project directory;
 - unit journeys prove that public GitHub state does not trigger authentication,
   while a failed private HTTPS clone uses device login and a repository-scoped
   helper without creating SSH keys or changing global Git configuration.
@@ -33,7 +35,7 @@ uses the developer's home directory.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.17` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.18` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -50,7 +52,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.17 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.18 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -124,21 +126,20 @@ Expected results:
 - the state is an ordinary Git repository, Konen explains that it did not
   commit anything, and its initial files are visible as untracked.
 
-To qualify the updater itself, install a published prerelease that already
-contains `konen update` in a disposable VM, then let it discover this candidate.
-Alpha.15 is the first such release. For this candidate, use alpha.16:
+To qualify the updater itself, install the immediately preceding prerelease in
+a disposable VM, then let it discover this candidate:
 
 ```console
-KONEN_VERSION=v0.1.0-alpha.16 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.17 sh install.sh
 konen update --dry-run --only konen
 konen version
 konen update --yes --only konen
 konen version
 ```
 
-The dry run must show alpha.16 as current and alpha.17 as available without
+The dry run must show alpha.17 as current and alpha.18 as available without
 changing the first `konen version`. The confirmed command must verify, stage and
-install alpha.17. The configured state path and its Git status must remain
+install alpha.18. The configured state path and its Git status must remain
 unchanged.
 
 Qualify format migration with an isolated configuration and state, never the
@@ -150,7 +151,7 @@ export XDG_CONFIG_HOME="$HOME/.config-konen-migration-test"
 konen init --git "$HOME/home-migration-test"
 mkdir -p "$HOME/Projects/migration-example"
 printf '%s\n' \
-  'version = 1' \
+  'version = 2' \
   'path = "~/Projects/migration-example"' \
   'keep_invoking_tab = true' \
   '' \
@@ -173,8 +174,9 @@ find "$XDG_CONFIG_HOME/konen/migration-backups" -type f -print
 ```
 
 `doctor` must first reject the legacy local configuration with migration
-guidance. The dry run must show two `v0 → v1` diffs while both checksums remain
-unchanged. The confirmed migration must create private backups, make `doctor`
+guidance. The dry run must show `v0 → v1` for local configuration and `v0 → v2`
+for the project while both checksums remain unchanged. The confirmed migration
+must create private backups, make `doctor`
 healthy and leave the project under `revisão necessária`; approving commands is
 an explicit later action. A fabricated `version = 99` must be rejected with
 guidance to update Konen and must never be rewritten.
@@ -263,6 +265,8 @@ directory must be rejected rather than approved.
 Finally, exercise a project without requiring a graphical terminal:
 
 ```console
+export XDG_CONFIG_HOME="$HOME/.config-konen-project-test"
+konen init --git "$HOME/home-project-test"
 mkdir -p ~/Projects/example
 git -C ~/Projects/example init --initial-branch=main
 konen project add ~/Projects/example
@@ -275,12 +279,51 @@ approved, and the dry run must show the exact directory, tab title and empty
 command. Opening the tabs for real is a separate optional check on a graphical
 VM with Kitty and `allow_remote_control yes`.
 
+Qualify named actions in another harmless project. The task body belongs to the
+project's native `mise.toml`; the Konen manifest stores only the personal alias
+and tab reference:
+
+```console
+mkdir -p "$HOME/Projects/action-example"
+printf '%s\n' \
+  '[tasks.hello]' \
+  'run = "touch \"$HOME/konen-action-marker\""' \
+  > "$HOME/Projects/action-example/mise.toml"
+mise trust "$HOME/Projects/action-example/mise.toml"
+printf '%s\n' \
+  'version = 2' \
+  'path = "~/Projects/action-example"' \
+  '' \
+  '[actions.hello]' \
+  'task = "hello"' \
+  '' \
+  '[[tabs]]' \
+  'title = "Hello"' \
+  'action = "hello"' \
+  > "$HOME/home-project-test/projects/action-example.toml"
+konen run action-example hello --dry-run
+test ! -e "$HOME/konen-action-marker"
+konen project trust action-example
+konen dev action-example --dry-run
+konen run action-example hello
+test -e "$HOME/konen-action-marker"
+konen __complete actions action-example
+```
+
+The action dry run must show the `hello` action mapped to the `hello` task,
+report pending approval and leave
+the marker absent. Trust must expose the action and action-backed tab before
+approving them. The real run must call `mise run --raw hello` in the registered
+directory and create the marker. Completion must print `hello`. Changing the
+manifest invalidates Konen approval; changing the project `mise.toml` remains
+subject to mise's own trust boundary.
+
 Finally, edit the manifest outside Konen and prove that execution is blocked
 until the new digest is reviewed and approved:
 
 ```console
 sed -i "s/title = 'Terminal'/title = 'Terminal externo'/" \
-  ~/.local/share/konen/state/projects/example.toml
+  "$HOME/home-project-test/projects/example.toml"
 konen example
 konen project show example
 konen project trust example

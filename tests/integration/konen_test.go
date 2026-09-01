@@ -167,6 +167,7 @@ func TestFirstRunJourneyThroughBuiltExecutable(t *testing.T) {
 	buildKonen(t, konen, "journey-test")
 	miseLog := filepath.Join(root, "mise.log")
 	applyMarker := filepath.Join(root, "mise-applied")
+	actionMarker := filepath.Join(root, "project-action-ran")
 	writeExecutable(t, filepath.Join(binDir, "mise"), `#!/bin/sh
 set -eu
 printf '%s\n' "$*" >> "$KONEN_TEST_MISE_LOG"
@@ -198,6 +199,10 @@ case " $* " in
       printf 'fixture apply: changed go\n'
     fi
     ;;
+  " run --raw ci:check ")
+    : > "$KONEN_TEST_ACTION_MARKER"
+    printf 'fixture project action: checks\n'
+    ;;
   " trust "*)
     ;;
   *)
@@ -208,13 +213,14 @@ esac
 `)
 
 	environment := testEnvironment(map[string]string{
-		"HOME":                    home,
-		"XDG_CONFIG_HOME":         configDir,
-		"PATH":                    binDir + ":/usr/bin:/bin",
-		"SHELL":                   "/bin/sh",
-		"TMPDIR":                  tempDir,
-		"KONEN_TEST_MISE_LOG":     miseLog,
-		"KONEN_TEST_APPLY_MARKER": applyMarker,
+		"HOME":                     home,
+		"XDG_CONFIG_HOME":          configDir,
+		"PATH":                     binDir + ":/usr/bin:/bin",
+		"SHELL":                    "/bin/sh",
+		"TMPDIR":                   tempDir,
+		"KONEN_TEST_MISE_LOG":      miseLog,
+		"KONEN_TEST_APPLY_MARKER":  applyMarker,
+		"KONEN_TEST_ACTION_MARKER": actionMarker,
 	})
 
 	output := runCommand(t, root, environment, konen, "init", "--git", stateDir)
@@ -321,6 +327,7 @@ esac
 	completion := runCommand(t, root, environment, konen, "completion", "zsh")
 	assertContains(t, completion, "#compdef konen")
 	assertContains(t, completion, "__complete projects")
+	assertContains(t, completion, "__complete actions")
 	assertContains(t, completion, "dotfile")
 	assertContains(t, completion, "installer")
 	assertContains(t, completion, "migrate")
@@ -328,14 +335,21 @@ esac
 	assertContains(t, completion, "ready pending missing different unknown")
 
 	manifestPath := filepath.Join(stateDir, "projects", "sample.toml")
-	manifest := `version = 1
+	manifest := `version = 2
 path = "~/Projects/sample"
 keep_invoking_tab = true
+
+[actions.checks]
+task = "ci:check"
 
 [[tabs]]
 title = "Terminal"
 command = "git status"
 hold = true
+
+[[tabs]]
+title = "Checks"
+action = "checks"
 `
 	if err := os.WriteFile(manifestPath, []byte(manifest), 0o644); err != nil {
 		t.Fatal(err)
@@ -346,10 +360,22 @@ hold = true
 	assertContains(t, output, "revisão necessária")
 	output = runCommand(t, root, environment, konen, "project", "show", "sample")
 	assertContains(t, output, `command = "git status"`)
+	assertContains(t, output, `action = "checks"`)
 	output = runCommand(t, root, environment, konen, "dev", "sample", "--dry-run")
 	assertContains(t, output, "Aprovação local: pendente")
+	assertContains(t, output, "ação checks → mise run --raw ci:check")
+	output = runCommand(t, root, environment, konen, "run", "sample", "checks", "--dry-run")
+	assertContains(t, output, "Nenhuma tarefa foi executada")
+	if _, err := os.Stat(actionMarker); !os.IsNotExist(err) {
+		t.Fatalf("action dry run executed the task: %v", err)
+	}
 	output = runCommand(t, root, environment, konen, "project", "trust", "sample")
 	assertContains(t, output, "Projeto aprovado: sample")
+	output = runCommand(t, projectDir, environment, konen, "run", "checks")
+	assertContains(t, output, "fixture project action: checks")
+	if _, err := os.Stat(actionMarker); err != nil {
+		t.Fatalf("trusted project action did not run: %v", err)
+	}
 	output = runCommand(t, root, environment, konen, "projects")
 	assertContains(t, output, "aprovado")
 	output = runCommand(t, root, environment, konen, "sample", "--dry-run")
@@ -361,14 +387,17 @@ hold = true
 	if got := runCommand(t, root, environment, konen, "__complete", "projects"); got != "sample\n" {
 		t.Fatalf("dynamic completion = %q, want %q", got, "sample\\n")
 	}
+	if got := runCommand(t, root, environment, konen, "__complete", "actions", "sample"); got != "checks\n" {
+		t.Fatalf("action completion = %q, want %q", got, "checks\\n")
+	}
 
 	configPath := filepath.Join(configDir, "konen", "config.toml")
-	for _, path := range []string{configPath, manifestPath} {
+	for path, version := range map[string]string{configPath: "version = 1\n", manifestPath: "version = 2\n"} {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
 		}
-		legacy := strings.Replace(string(data), "version = 1\n", "", 1)
+		legacy := strings.Replace(string(data), version, "", 1)
 		if err := os.WriteFile(path, []byte(legacy), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -381,7 +410,7 @@ hold = true
 	configDigest := fileDigest(t, configPath)
 	projectDigest := fileDigest(t, manifestPath)
 	output = runCommand(t, root, environment, konen, "migrate", "--dry-run")
-	for _, fragment := range []string{"migrar v0 → v1", "+version = 1", "Nenhum arquivo foi alterado"} {
+	for _, fragment := range []string{"migrar v0 → v1", "migrar v0 → v2", "+version = 1", "+version = 2", "Nenhum arquivo foi alterado"} {
 		assertContains(t, output, fragment)
 	}
 	if fileDigest(t, configPath) != configDigest || fileDigest(t, manifestPath) != projectDigest {

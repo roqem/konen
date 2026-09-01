@@ -64,9 +64,9 @@ Objetivo: tornar manutenção e atualização tão claras quanto o primeiro uso.
   visíveis;
 - [x] definir migrações explícitas para os formatos próprios do Konen, sem
   versionar ou reescrever o `mise.toml` nativo;
-- [ ] modelar ações nomeadas de projeto, como preparar, testar, abrir console ou
+- [x] modelar ações nomeadas de projeto, como preparar, testar, abrir console ou
   gerar cobertura, sem transformá-las em funções escondidas do Konen;
-- [ ] permitir que abas reutilizem essas ações em vez de duplicar comandos longos.
+- [x] permitir que abas reutilizem essas ações em vez de duplicar comandos longos.
 
 Critério de conclusão: o usuário entende o resultado de cada aplicação, atualiza
 o produto conscientemente e mantém rotinas de projeto no estado central sem

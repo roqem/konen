@@ -1,25 +1,24 @@
-# Projects and Kitty sessions
+# Projetos, ações e sessões do Kitty
 
-Konen keeps workspace sessions in the versionable machine state instead of
-adding Kitty or editor files to every source repository.
+O Konen guarda a rotina pessoal de cada workspace no estado versionável da
+máquina, sem espalhar arquivos de Kitty ou do editor em todos os repositórios.
 
-## Workflow
+## Fluxo básico
 
-From a project directory, run:
+Dentro do projeto, execute:
 
 ```console
 konen project add
 ```
 
-The guided form asks for a short name, the project directory, an optional shell
-and one or more tabs. An empty command opens a login shell in the project. A
-non-empty command is passed to an interactive login shell with `-lic`, so the
-workspace sees the environment configured in `.zshrc`; `hold = true` asks Kitty
-to open a shell after the command exits. The first tab defaults to a neutral
-`Terminal` with an empty command; editors such as Neovim are never assumed to
-be installed.
+O assistente pergunta um nome curto, a pasta, um shell opcional, ações nomeadas
+e uma ou mais abas. Uma aba vazia abre o shell de login na pasta do projeto. Um
+`command` direto é passado ao shell interativo com `-lic`, de modo que ele veja
+o ambiente do usuário; `hold = true` mantém a aba aberta depois que o comando
+termina. O primeiro cadastro pode ficar só com a aba `Terminal`: editores como
+o Neovim nunca são presumidos.
 
-Use the project from its directory or by name:
+Use o projeto pela pasta atual ou pelo nome:
 
 ```console
 konen projects
@@ -29,70 +28,106 @@ konen my-app
 konen dev my-app --dry-run
 ```
 
-`konen NAME` is the short form of `konen dev NAME` for a registered project;
-it never scans arbitrary folders or registers one implicitly. `konen projects`
-is the canonical list command. `konen project list` remains available as a
-compatibility alias beside the singular project actions.
+`konen NOME` é a forma curta de `konen dev NOME` para um projeto já
+cadastrado; pastas arbitrárias nunca são registradas implicitamente. `konen
+projects` é o comando principal de listagem. `konen project list` permanece
+como alias compatível.
 
-Inside Kitty, Konen uses remote control to add tabs to the same OS window and
-then focuses the first created tab. The invoking tab remains open by default.
-This requires `allow_remote_control yes` in `kitty.conf`. Outside Kitty, Konen
-renders a temporary native session file and opens a new Kitty window.
+Dentro do Kitty, o Konen usa o controle remoto para adicionar abas à janela
+atual e focar a primeira que criou. A aba invocadora permanece aberta por
+padrão. Isso exige `allow_remote_control yes` no `kitty.conf`. Fora do Kitty,
+ele produz uma sessão nativa temporária e abre uma nova janela.
 
-## Manifest
+## Ações são tarefas do mise
 
-The guided flow writes `projects/NAME.toml` in the Konen state:
+Uma ação é apenas um nome pessoal e estável para uma tarefa já declarada pelo
+projeto. Por exemplo, o repositório pode conter:
 
 ```toml
-version = 1
+# mise.toml do projeto
+[tasks.test]
+run = "go test ./..."
+
+[tasks.console]
+run = "docker compose exec web sh"
+```
+
+O manifesto do Konen aponta para essas tarefas; ele não copia seus comandos nem
+cria funções escondidas:
+
+O fluxo guiado grava `projects/NOME.toml` no estado do Konen:
+
+```toml
+version = 2
 path = "~/Documents/Projects/my-app"
 keep_invoking_tab = false
+
+[actions.checks]
+task = "test"
+
+[actions.web-console]
+task = "console"
 
 [[tabs]]
 title = "Neovim"
 command = "nvim ."
 
 [[tabs]]
-title = "Docker"
-command = "docker compose --profile=mongo up -d && docker compose exec web sh"
+title = "Checks"
+action = "checks"
+hold = true
 
 [[tabs]]
-title = "Claude"
-command = "claude"
+title = "Console"
+action = "web-console"
 
 [[tabs]]
 title = "Terminal"
-command = "git status"
-hold = true
 ```
 
-`keep_invoking_tab` defaults to `true` for existing manifests. Setting it to
-`false` closes only the Kitty terminal that invoked `konen dev` after all tabs
-have opened and the first has received focus; if it is the only terminal in its
-tab, Kitty closes that tab as well.
+Tanto `konen run my-app checks` quanto a aba `Checks` chamam a mesma
+operação nativa, `mise run --raw test`, dentro do projeto. Uma aba usa `action`
+ou `command`; os dois juntos são recusados. Dentro da pasta cadastrada, omita o
+projeto:
 
-Edit it through the guided form with `konen project edit NAME`. `show`, `list`
-and `--dry-run` are non-mutating inspection commands. The list and dry-run
-output also report whether each local approval is valid or needs review.
+```console
+konen run checks --dry-run
+konen run checks
+```
 
-The integer `version` belongs to this Konen-specific manifest, not to the
-project's source code. When the format evolves, `konen migrate --dry-run`
-shows the proposed manifest diff and `konen migrate` creates a local backup
-before replacing it. A newer, unsupported version is never rewritten. Every
-migrated manifest requires a fresh project approval.
+`konen project run my-app checks` é a forma equivalente sob o grupo
+`project`. O `--dry-run` mostra pasta, ação, tarefa e aprovação, sem chamar o
+mise. O `mise.toml` do projeto continua sendo a fonte da tarefa reproduzível;
+o manifesto central contém somente seus nomes pessoais e a disposição das
+abas.
 
-## Trust
+`keep_invoking_tab` vale apenas dentro do Kitty e usa `true` por padrão.
+`false` fecha o terminal que invocou `konen dev` depois que todas as novas abas
+abriram e a primeira recebeu foco; se ele for o único terminal da aba, o Kitty
+fecha essa aba também.
 
-Project manifests contain executable commands. Approval is therefore local and
-bound to the exact SHA-256 digest of each manifest; it is not committed with the
-state. The add/edit wizard approves what it has just written. Changes made by a
-Git pull or another editor invalidate that approval:
+Edite o cadastro pelo assistente com `konen project edit NOME`. `show`, `list`
+e `--dry-run` são comandos de inspeção. A listagem e os planos também informam
+se a aprovação local ainda vale ou precisa de revisão.
+
+O inteiro `version` pertence somente ao manifesto do Konen, não ao código do
+projeto. Quando o formato evolui, `konen migrate --dry-run` mostra o diff e
+`konen migrate` cria um backup local antes da substituição. Uma versão futura
+é recusada, e todo manifesto migrado precisa de nova aprovação.
+
+## Confiança
+
+O manifesto contém comandos diretos e nomes de tarefas executáveis. Sua
+aprovação é local, vinculada ao SHA-256 exato do arquivo e não é versionada com
+o estado. O assistente aprova o arquivo que acabou de gravar; uma edição manual
+ou um pull invalida a aprovação:
 
 ```console
 konen project show my-app
 konen project trust my-app
 ```
 
-Konen will not launch any tab until the current manifest has been approved.
-Moving the state repository changes each manifest's absolute identity and
-therefore requires a new local approval even when its contents are unchanged.
+O Konen não abre abas nem executa ações antes dessa aprovação. Uma ação ainda é
+implementada pelo `mise.toml` do projeto, então o mise também pode pedir
+`mise trust` quando esse arquivo for novo ou tiver mudado. As duas aprovações
+protegem superfícies diferentes; o Konen não contorna a confiança do mise.

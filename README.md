@@ -35,7 +35,7 @@ selecionadas automaticamente:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.17 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.18 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -141,7 +141,7 @@ nova revisão e novo `konen trust`.
 | **Pacote do sistema** | Pacote instalado por apt, dnf, pacman, Homebrew ou equivalente. |
 | **Tarefa** | Script versionado que mise consegue executar. |
 | **Instalador pessoal** | Tarefa idempotente usada quando uma instalação não cabe nas declarações normais. |
-| **Manifesto de projeto** | Arquivo TOML que descreve a pasta e as abas usadas por `konen dev`. |
+| **Manifesto de projeto** | Arquivo TOML que descreve pasta, ações pessoais e abas usadas por `konen run` e `konen dev`. |
 | **Trust / confiança** | Aprovação local do código que aquele estado ou projeto pode executar. |
 
 `Idempotente` significa que executar novamente é seguro: a automação verifica
@@ -161,7 +161,7 @@ home/
 │   └── install/   # instaladores pessoais executáveis
 ├── scripts/
 │   └── bin/       # comandos pessoais adicionados ao PATH
-└── projects/      # sessões de projetos usadas por konen dev
+└── projects/      # ações e sessões usadas por konen run/dev
 ```
 
 Konen guarda apenas o caminho dessa pasta em
@@ -589,14 +589,19 @@ konen dev --dry-run
 konen dev
 ```
 
-O assistente pergunta o nome, a pasta, o shell e as abas. Uma aba pode abrir
-`nvim .`, subir Docker, iniciar Codex/Claude ou apenas deixar um terminal. Os
-manifestos ficam em `~/home/projects`, portanto também entram no backup.
+O assistente pergunta o nome, a pasta, o shell, ações nomeadas e abas. Uma ação
+é um nome pessoal para uma tarefa que o próprio projeto já declara no mise. Por
+exemplo, `checks` pode apontar para a tarefa `test`; `konen run my-app checks` e
+uma aba com `action = "checks"` executam a mesma tarefa, sem copiar seu comando
+para o manifesto. Abas ainda podem abrir um comando direto, como `nvim .`, ou
+apenas deixar um terminal. Os manifestos ficam em `~/home/projects`, portanto
+também entram no backup.
 
 `konen dev` encontra o projeto pela pasta atual. De qualquer outro lugar, use
 `konen dev my-app` ou o atalho `konen my-app`. Comandos de projeto têm uma
 aprovação local separada; uma edição ou pull exige
-`konen project trust NOME`. Veja [docs/projects.md](docs/projects.md).
+`konen project trust NOME`. A tarefa continua no `mise.toml` do projeto e
+também respeita a confiança do mise. Veja [docs/projects.md](docs/projects.md).
 
 ## Comandos do dia a dia
 
@@ -626,8 +631,9 @@ aprovação local separada; uma edição ou pull exige
 | `konen installer add [NOME]` | Cria e seleciona um instalador pessoal sem executá-lo. |
 | `konen installer add --from ARQUIVO [NOME]` | Importa e seleciona um instalador existente. |
 | `konen dotfile add CAMINHO` | Passa a gerenciar uma configuração existente. |
-| `konen project add [DIR]` | Cadastra um projeto e suas abas. |
+| `konen project add [DIR]` | Cadastra um projeto, suas ações e abas. |
 | `konen projects` | Lista projetos e a situação da aprovação. |
+| `konen run [PROJETO] AÇÃO` | Executa uma ação nomeada pela tarefa do mise. |
 | `konen dev [NOME]` | Abre as abas do projeto no Kitty. |
 | `konen doctor` | Diagnostica instalação, estado, confiança, mise e Git. |
 | `konen completion SHELL` | Gera autocomplete para Zsh, Bash ou Fish. |
@@ -657,7 +663,7 @@ Para Fish:
 konen completion fish > ~/.config/fish/completions/konen.fish
 ```
 
-O autocomplete inclui comandos, opções, caminhos e nomes de projetos.
+O autocomplete inclui comandos, opções, caminhos, nomes de projetos e ações.
 
 ## Compatibilidade e migrações
 

@@ -119,6 +119,9 @@ func (unusedPrompter) Project(ui.ProjectAnswer) (ui.ProjectAnswer, error) {
 func (unusedPrompter) ChooseProject([]string) (string, error) {
 	return "", errors.New("unexpected prompt")
 }
+func (unusedPrompter) ChooseProjectAction(string, []string) (string, error) {
+	return "", errors.New("unexpected prompt")
+}
 
 type projectPrompter struct {
 	unusedPrompter
@@ -458,7 +461,7 @@ func TestProjectsListsThroughPluralCommand(t *testing.T) {
 	}
 	store := project.Store{StateDir: stateDir, HomeDir: root}
 	if _, err := store.Save("sample", project.Manifest{
-		Version: 1, Path: root, Tabs: []project.Tab{{Title: "Terminal"}},
+		Version: 2, Path: root, Tabs: []project.Tab{{Title: "Terminal"}},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -493,7 +496,7 @@ func TestRegisteredProjectNameIsDevShortcut(t *testing.T) {
 	}
 	store := project.Store{StateDir: stateDir, HomeDir: root}
 	if _, err := store.Save("sample", project.Manifest{
-		Version: 1, Path: projectDir, Tabs: []project.Tab{{Title: "Terminal"}},
+		Version: 2, Path: projectDir, Tabs: []project.Tab{{Title: "Terminal"}},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -572,6 +575,7 @@ func TestHelpGroupsCommandsAndSeparatesAddOperations(t *testing.T) {
 		"konen command add [NOME]",
 		"konen installer add [NOME]",
 		"konen project add [DIR]", "konen dotfile add CAMINHO...",
+		"konen run [PROJETO] AÇÃO", "konen project run NOME AÇÃO",
 	} {
 		assertOutputContains(t, out.String(), fragment)
 	}
@@ -600,7 +604,11 @@ func TestProjectAddGuidedFlowSavesAndTrustsManifest(t *testing.T) {
 		Interactive: true,
 		Prompter: projectPrompter{answer: ui.ProjectAnswer{
 			Name: "sample", Path: projectDir, KeepInvokingTab: true,
-			Tabs: []ui.ProjectTabAnswer{{Title: "Terminal", Command: "git status", Hold: true}},
+			Actions: []ui.ProjectActionAnswer{{Name: "checks", Task: "ci:check"}},
+			Tabs: []ui.ProjectTabAnswer{
+				{Title: "Checks", Action: "checks", Hold: true},
+				{Title: "Terminal", Command: "git status"},
+			},
 		}},
 	})
 	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
@@ -618,7 +626,8 @@ func TestProjectAddGuidedFlowSavesAndTrustsManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if manifest.Path != "~/Projects/sample" || len(manifest.Tabs) != 1 || manifest.Tabs[0].Command != "git status" {
+	if manifest.Path != "~/Projects/sample" || len(manifest.Tabs) != 2 ||
+		manifest.Tabs[0].Action != "checks" || manifest.Actions["checks"].Task != "ci:check" {
 		t.Fatalf("saved manifest = %#v", manifest)
 	}
 	trusted, err := application.projectTrust().IsTrusted(manifestPath)
@@ -828,7 +837,7 @@ func TestDevOpensTabsInCurrentKittyAndFocusesFirst(t *testing.T) {
 	}
 	store := project.Store{StateDir: stateDir, HomeDir: home}
 	manifestPath, err := store.Save("sample", project.Manifest{
-		Version: 1,
+		Version: 2,
 		Path:    "~/Documents/Projects/sample",
 		Tabs: []project.Tab{
 			{Title: "Editor", Command: "nvim ."},
@@ -862,6 +871,148 @@ func TestDevOpensTabsInCurrentKittyAndFocusesFirst(t *testing.T) {
 	}
 }
 
+func TestRunNamedProjectActionUsesMiseWithoutAShell(t *testing.T) {
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "sample")
+	stateDir := filepath.Join(root, "state")
+	configPath := filepath.Join(root, "config", "config.toml")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{paths: map[string]string{"mise": "/opt/konen/mise"}}
+	var out bytes.Buffer
+	application := New(Options{
+		ConfigPath: configPath, HomeDir: root, WorkDir: projectDir,
+		Out: &out, Err: &out, Runner: runner, Prompter: unusedPrompter{},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	store := project.Store{StateDir: stateDir, HomeDir: root}
+	manifestPath, err := store.Save("sample", project.Manifest{
+		Version: 2, Path: projectDir,
+		Actions: map[string]project.Action{"checks": {Task: "ci:check"}},
+		Tabs:    []project.Tab{{Title: "Checks", Action: "checks"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := application.projectTrust().Trust(manifestPath); err != nil {
+		t.Fatal(err)
+	}
+	runner.runs = nil
+	out.Reset()
+
+	if err := application.Run(context.Background(), []string{"run", "checks"}); err != nil {
+		t.Fatal(err)
+	}
+	want := runCall{dir: projectDir, name: "/opt/konen/mise", args: []string{"run", "--raw", "ci:check"}}
+	if len(runner.runs) != 1 || !reflect.DeepEqual(runner.runs[0], want) {
+		t.Fatalf("action calls = %#v, want %#v", runner.runs, want)
+	}
+	for _, fragment := range []string{"Projeto: sample", "checks", "ci:check", "mise run --raw ci:check"} {
+		assertOutputContains(t, out.String(), fragment)
+	}
+}
+
+func TestRunNamedProjectActionDryRunAndTrustBoundary(t *testing.T) {
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "sample")
+	stateDir := filepath.Join(root, "state")
+	configPath := filepath.Join(root, "config", "config.toml")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise"}}
+	var out bytes.Buffer
+	application := New(Options{
+		ConfigPath: configPath, HomeDir: root, WorkDir: root,
+		Out: &out, Err: &out, Runner: runner, Prompter: unusedPrompter{},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	store := project.Store{StateDir: stateDir, HomeDir: root}
+	if _, err := store.Save("sample", project.Manifest{
+		Version: 2, Path: projectDir,
+		Actions: map[string]project.Action{"test": {Task: "test"}},
+		Tabs:    []project.Tab{{Title: "Terminal"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	runner.runs = nil
+	out.Reset()
+
+	if err := application.Run(context.Background(), []string{"project", "run", "sample", "test", "--dry-run"}); err != nil {
+		t.Fatal(err)
+	}
+	assertOutputContains(t, out.String(), "Aprovação local: pendente")
+	assertOutputContains(t, out.String(), "Nenhuma tarefa foi executada")
+	if len(runner.runs) != 0 {
+		t.Fatalf("dry-run executed commands: %#v", runner.runs)
+	}
+
+	err := application.Run(context.Background(), []string{"run", "sample", "test"})
+	if err == nil || !strings.Contains(err.Error(), "ainda não foram aprovadas") {
+		t.Fatalf("untrusted action error = %v", err)
+	}
+	if len(runner.runs) != 0 {
+		t.Fatalf("untrusted action executed commands: %#v", runner.runs)
+	}
+}
+
+func TestDevActionTabRunsTheSameMiseTask(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	projectDir := filepath.Join(home, "sample")
+	stateDir := filepath.Join(root, "state")
+	configPath := filepath.Join(root, "config", "config.toml")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{
+		paths:   map[string]string{"mise": "/opt/konen bin/mise", "kitten": "/bin/kitten"},
+		outputs: map[string]string{"/bin/kitten": "61\n"},
+	}
+	application := New(Options{
+		ConfigPath: configPath, HomeDir: home, WorkDir: projectDir,
+		Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, Runner: runner, Prompter: unusedPrompter{},
+		Getenv: func(name string) string {
+			if name == "KITTY_WINDOW_ID" {
+				return "4"
+			}
+			if name == "SHELL" {
+				return "/bin/zsh"
+			}
+			return ""
+		},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	store := project.Store{StateDir: stateDir, HomeDir: home}
+	manifestPath, err := store.Save("sample", project.Manifest{
+		Version: 2, Path: projectDir,
+		Actions: map[string]project.Action{"checks": {Task: "ci:check"}},
+		Tabs:    []project.Tab{{Title: "Checks", Action: "checks", Hold: true}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := application.projectTrust().Trust(manifestPath); err != nil {
+		t.Fatal(err)
+	}
+	runner.runs = nil
+
+	if err := application.Run(context.Background(), []string{"dev", "sample"}); err != nil {
+		t.Fatal(err)
+	}
+	wantCommand := "'/opt/konen bin/mise' run --raw 'ci:check'"
+	if len(runner.runs) != 3 || runner.runs[1].args[len(runner.runs[1].args)-1] != wantCommand {
+		t.Fatalf("action tab calls = %#v, command = %q", runner.runs, wantCommand)
+	}
+}
+
 func TestDevDryRunShowsPendingApprovalWithoutLaunching(t *testing.T) {
 	root := t.TempDir()
 	home := filepath.Join(root, "home")
@@ -883,7 +1034,7 @@ func TestDevDryRunShowsPendingApprovalWithoutLaunching(t *testing.T) {
 	}
 	store := project.Store{StateDir: stateDir, HomeDir: home}
 	if _, err := store.Save("sample", project.Manifest{
-		Version: 1, Path: projectDir, Tabs: []project.Tab{{Title: "Terminal"}},
+		Version: 2, Path: projectDir, Tabs: []project.Tab{{Title: "Terminal"}},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -921,7 +1072,7 @@ func TestDevRefusesChangedProjectUntilTrustedAgain(t *testing.T) {
 	}
 	store := project.Store{StateDir: stateDir, HomeDir: home}
 	manifestPath, err := store.Save("sample", project.Manifest{
-		Version: 1, Path: projectDir, Tabs: []project.Tab{{Title: "Terminal"}},
+		Version: 2, Path: projectDir, Tabs: []project.Tab{{Title: "Terminal"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -929,7 +1080,7 @@ func TestDevRefusesChangedProjectUntilTrustedAgain(t *testing.T) {
 	if err := application.projectTrust().Trust(manifestPath); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(manifestPath, []byte("version = 1\npath = '"+projectDir+"'\n[[tabs]]\ntitle = 'Changed'\n"), 0o644); err != nil {
+	if err := os.WriteFile(manifestPath, []byte("version = 2\npath = '"+projectDir+"'\n[[tabs]]\ntitle = 'Changed'\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	runner.runs = nil
@@ -942,7 +1093,7 @@ func TestDevRefusesChangedProjectUntilTrustedAgain(t *testing.T) {
 }
 
 func TestRenderKittySessionQuotesCommands(t *testing.T) {
-	got := renderKittySession("/tmp/project with space", "/bin/zsh", project.Manifest{
+	got := renderKittySession("/tmp/project with space", "/bin/zsh", "", project.Manifest{
 		Tabs: []project.Tab{{Title: "It's ready", Command: "printf '%s' ok", Hold: true}},
 	})
 	want := "new_tab 'It'\\''s ready'\n" +
@@ -986,7 +1137,7 @@ func TestDevCanCloseInvokingKittyWindow(t *testing.T) {
 	keep := false
 	store := project.Store{StateDir: stateDir, HomeDir: home}
 	manifestPath, err := store.Save("sample", project.Manifest{
-		Version: 1, Path: projectDir, KeepInvokingTab: &keep,
+		Version: 2, Path: projectDir, KeepInvokingTab: &keep,
 		Tabs: []project.Tab{{Title: "Terminal"}},
 	})
 	if err != nil {

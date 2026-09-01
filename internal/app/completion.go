@@ -21,7 +21,7 @@ func (a *App) runCompletion(args []string) error {
 }
 
 func (a *App) runInternalComplete(args []string) error {
-	if len(args) != 1 || args[0] != "projects" {
+	if len(args) < 1 || len(args) > 2 {
 		return errors.New("consulta de autocomplete inválida")
 	}
 	stateDir, err := a.loadState()
@@ -29,12 +29,41 @@ func (a *App) runInternalComplete(args []string) error {
 		return err
 	}
 	store := project.Store{StateDir: stateDir, HomeDir: a.options.HomeDir}
-	projects, err := store.List()
-	if err != nil {
-		return err
-	}
-	for _, item := range projects {
-		fmt.Fprintln(a.options.Out, item.Name)
+	switch args[0] {
+	case "projects":
+		if len(args) != 1 {
+			return errors.New("consulta de autocomplete inválida")
+		}
+		projects, err := store.List()
+		if err != nil {
+			return err
+		}
+		for _, item := range projects {
+			fmt.Fprintln(a.options.Out, item.Name)
+		}
+	case "actions":
+		var name string
+		if len(args) == 2 {
+			name = args[1]
+		} else {
+			matches, err := store.MatchDirectory(a.options.WorkDir)
+			if err != nil {
+				return err
+			}
+			if len(matches) == 0 {
+				return nil
+			}
+			name = matches[0].Name
+		}
+		manifest, _, err := store.Load(name)
+		if err != nil {
+			return err
+		}
+		for _, action := range sortedActionNames(manifest) {
+			fmt.Fprintln(a.options.Out, action)
+		}
+	default:
+		return errors.New("consulta de autocomplete inválida")
 	}
 	return nil
 }
@@ -60,6 +89,17 @@ _konen_projects() {
   _describe 'projeto' projects
 }
 
+_konen_actions() {
+  local project=$1
+  local -a actions
+  if [[ -n $project ]]; then
+    actions=("${(@f)$(konen __complete actions "$project" 2>/dev/null)}")
+  else
+    actions=("${(@f)$(konen __complete actions 2>/dev/null)}")
+  fi
+  _describe 'ação' actions
+}
+
 _konen() {
   local -a commands tool_actions package_actions repo_actions command_actions installer_actions dotfile_actions project_actions
   commands=(
@@ -77,8 +117,9 @@ _konen() {
     'installer:gerencia instaladores pessoais no estado'
     'dotfile:gerencia arquivos de configuração'
     'projects:lista os projetos cadastrados'
-    'project:gerencia projetos e suas sessões'
+    'project:gerencia projetos, ações e sessões'
     'dev:abre um projeto no Kitty'
+    'run:executa uma ação nomeada do projeto'
     'trust:confia no estado após revisão'
     'doctor:diagnostica a instalação'
     'completion:gera autocomplete para o shell'
@@ -109,6 +150,7 @@ _konen() {
     'list:lista os projetos'
     'show:mostra o manifesto de um projeto'
     'trust:aprova os comandos de um projeto'
+    'run:executa uma ação nomeada do projeto'
   )
 
   if (( CURRENT == 2 )); then
@@ -291,6 +333,13 @@ _konen() {
         '--dry-run[mostra a sessão sem abrir abas]' \
         '1:projeto:_konen_projects'
       ;;
+    run)
+      if (( CURRENT == 2 )); then
+        _alternative 'actions:ação:_konen_actions' 'projects:projeto:_konen_projects'
+      else
+        _konen_actions "$words[2]"
+      fi
+      ;;
     completion)
       _arguments '1:shell:(zsh bash fish)'
       ;;
@@ -305,6 +354,13 @@ _konen() {
       case $action in
         add) _arguments '1:pasta do projeto:_directories' ;;
         edit|show|trust) _arguments '1:projeto:_konen_projects' ;;
+        run)
+          if (( CURRENT == 2 )); then
+            _konen_projects
+          else
+            _konen_actions "$words[2]"
+          fi
+          ;;
         list) _arguments ;;
         *) _describe 'ação' project_actions ;;
       esac
@@ -326,7 +382,7 @@ const bashCompletion = `_konen_completion() {
   command="${COMP_WORDS[1]}"
 
   if [[ $COMP_CWORD -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W "init status plan diff apply migrate update tool package repo command installer dotfile projects project dev trust doctor completion version help $(konen __complete projects 2>/dev/null)" -- "$current") )
+    COMPREPLY=( $(compgen -W "init status plan diff apply migrate update tool package repo command installer dotfile projects project dev run trust doctor completion version help $(konen __complete projects 2>/dev/null)" -- "$current") )
     return
   fi
 
@@ -426,17 +482,28 @@ const bashCompletion = `_konen_completion() {
     dev)
       COMPREPLY=( $(compgen -W "--dry-run -h --help $(konen __complete projects 2>/dev/null)" -- "$current") )
       ;;
+    run)
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "$(konen __complete actions 2>/dev/null) $(konen __complete projects 2>/dev/null)" -- "$current") )
+      elif [[ $COMP_CWORD -eq 3 ]]; then
+        COMPREPLY=( $(compgen -W "$(konen __complete actions "${COMP_WORDS[2]}" 2>/dev/null)" -- "$current") )
+      fi
+      ;;
     completion)
       COMPREPLY=( $(compgen -W 'zsh bash fish' -- "$current") )
       ;;
     project)
       action="${COMP_WORDS[2]}"
       if [[ $COMP_CWORD -eq 2 ]]; then
-        COMPREPLY=( $(compgen -W 'add edit list show trust' -- "$current") )
+        COMPREPLY=( $(compgen -W 'add edit list show trust run' -- "$current") )
       elif [[ $action == add ]]; then
         COMPREPLY=( $(compgen -d -- "$current") )
       elif [[ $action == edit || $action == show || $action == trust ]]; then
         COMPREPLY=( $(compgen -W "$(konen __complete projects 2>/dev/null)" -- "$current") )
+      elif [[ $action == run && $COMP_CWORD -eq 3 ]]; then
+        COMPREPLY=( $(compgen -W "$(konen __complete projects 2>/dev/null)" -- "$current") )
+      elif [[ $action == run && $COMP_CWORD -eq 4 ]]; then
+        COMPREPLY=( $(compgen -W "$(konen __complete actions "${COMP_WORDS[3]}" 2>/dev/null)" -- "$current") )
       fi
       ;;
     *)
@@ -463,8 +530,9 @@ complete -c konen -n '__fish_use_subcommand' -a command -d 'Gerencia comandos pe
 complete -c konen -n '__fish_use_subcommand' -a installer -d 'Gerencia instaladores pessoais no estado'
 complete -c konen -n '__fish_use_subcommand' -a dotfile -d 'Gerencia arquivos de configuração'
 complete -c konen -n '__fish_use_subcommand' -a projects -d 'Lista os projetos cadastrados'
-complete -c konen -n '__fish_use_subcommand' -a project -d 'Gerencia projetos e suas sessões'
+complete -c konen -n '__fish_use_subcommand' -a project -d 'Gerencia projetos, ações e sessões'
 complete -c konen -n '__fish_use_subcommand' -a dev -d 'Abre um projeto no Kitty'
+complete -c konen -n '__fish_use_subcommand' -a run -d 'Executa uma ação nomeada do projeto'
 complete -c konen -n '__fish_use_subcommand' -a trust -d 'Confia no estado após revisão'
 complete -c konen -n '__fish_use_subcommand' -a doctor -d 'Diagnostica a instalação'
 complete -c konen -n '__fish_use_subcommand' -a completion -d 'Gera autocomplete para o shell'
@@ -507,6 +575,8 @@ complete -c konen -n '__fish_seen_subcommand_from dotfile' -a add -d 'Adiciona u
 complete -c konen -n '__fish_seen_subcommand_from dotfile' -l mode -r -a 'symlink copy template' -d 'Modo do dotfile'
 complete -c konen -n '__fish_seen_subcommand_from dev' -l dry-run -d 'Mostra a sessão sem abrir abas'
 complete -c konen -n '__fish_seen_subcommand_from dev' -a '(konen __complete projects 2>/dev/null)' -d 'Projeto'
-complete -c konen -n '__fish_seen_subcommand_from project' -a 'add edit list show trust'
+complete -c konen -n '__fish_seen_subcommand_from run' -l dry-run -d 'Mostra a ação sem executar a tarefa'
+complete -c konen -n '__fish_seen_subcommand_from run' -a '(konen __complete actions 2>/dev/null) (konen __complete projects 2>/dev/null)' -d 'Ação ou projeto'
+complete -c konen -n '__fish_seen_subcommand_from project' -a 'add edit list show trust run'
 complete -c konen -n '__fish_seen_subcommand_from completion' -a 'zsh bash fish'
 `

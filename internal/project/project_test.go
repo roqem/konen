@@ -116,10 +116,10 @@ func TestPlanMigrationAddsVersionToLegacyProjectWithoutChangingIt(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !plan.Needed() || plan.FromVersion != 0 || plan.ToVersion != 1 {
+	if !plan.Needed() || plan.FromVersion != 0 || plan.ToVersion != 2 {
 		t.Fatalf("migration = %#v", plan)
 	}
-	if !strings.HasPrefix(string(plan.After), "version = 1\n") || plan.Manifest.Path != "~/sample" {
+	if !strings.HasPrefix(string(plan.After), "version = 2\n") || plan.Manifest.Path != "~/sample" {
 		t.Fatalf("migrated project = %q, value = %#v", plan.After, plan.Manifest)
 	}
 	got, err := os.ReadFile(path)
@@ -128,6 +128,77 @@ func TestPlanMigrationAddsVersionToLegacyProjectWithoutChangingIt(t *testing.T) 
 	}
 	if string(got) != string(legacy) {
 		t.Fatalf("planning changed the project: %q", got)
+	}
+}
+
+func TestPlanMigrationOneToTwoOnlyChangesTheVersion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sample.toml")
+	legacy := []byte("# projeto\nversion = 1\npath = '~/sample'\n\n[[tabs]]\ntitle = 'Terminal'\ncommand = 'git status'\n")
+	if err := os.WriteFile(path, legacy, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := PlanMigration(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := strings.Replace(string(legacy), "version = 1", "version = 2", 1)
+	if plan.FromVersion != 1 || plan.ToVersion != 2 || string(plan.After) != want {
+		t.Fatalf("migration = %#v, after = %q", plan, plan.After)
+	}
+}
+
+func TestValidateActionsAndTabs(t *testing.T) {
+	valid := Manifest{
+		Version: manifestVersion,
+		Path:    "~/sample",
+		Actions: map[string]Action{"checks": {Task: "ci:check"}},
+		Tabs:    []Tab{{Title: "Checks", Action: "checks"}},
+	}
+	if err := Validate(valid); err != nil {
+		t.Fatalf("valid manifest error = %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		manifest Manifest
+		fragment string
+	}{
+		{
+			name: "unknown action",
+			manifest: Manifest{Version: manifestVersion, Path: "~/sample",
+				Tabs: []Tab{{Title: "Checks", Action: "missing"}}},
+			fragment: "ação inexistente",
+		},
+		{
+			name: "command and action",
+			manifest: Manifest{Version: manifestVersion, Path: "~/sample",
+				Actions: map[string]Action{"checks": {Task: "check"}},
+				Tabs:    []Tab{{Title: "Checks", Action: "checks", Command: "go test ./..."}}},
+			fragment: "não ambos",
+		},
+		{
+			name: "unsafe task",
+			manifest: Manifest{Version: manifestVersion, Path: "~/sample",
+				Actions: map[string]Action{"checks": {Task: "check && curl example.test"}},
+				Tabs:    []Tab{{Title: "Terminal"}}},
+			fragment: "tarefa do mise inválida",
+		},
+		{
+			name: "multiple task separator",
+			manifest: Manifest{Version: manifestVersion, Path: "~/sample",
+				Actions: map[string]Action{"checks": {Task: "test:::deploy"}},
+				Tabs:    []Tab{{Title: "Terminal"}}},
+			fragment: "uma única tarefa",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := Validate(test.manifest)
+			if err == nil || !strings.Contains(err.Error(), test.fragment) {
+				t.Fatalf("Validate() error = %v", err)
+			}
+		})
 	}
 }
 

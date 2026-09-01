@@ -114,6 +114,8 @@ func (a *App) run(ctx context.Context, args []string) error {
 		return a.runMigrate(args[1:])
 	case "dev":
 		return a.runDev(ctx, args[1:])
+	case "run":
+		return a.runNamedProjectAction(ctx, args[1:], false)
 	case "project":
 		return a.runProject(ctx, args[1:])
 	case "projects":
@@ -634,6 +636,7 @@ func (a *App) printHelp() {
 	a.printCommandGroup("Início rápido", [][2]string{
 		{"konen", "abre o menu interativo"},
 		{"konen NOME", "abre um projeto cadastrado"},
+		{"konen run [PROJETO] AÇÃO", "executa uma ação nomeada do projeto"},
 		{"konen help", "mostra esta ajuda"},
 	})
 	a.printCommandGroup("Máquina", [][2]string{
@@ -670,10 +673,11 @@ func (a *App) printHelp() {
 	})
 	a.printCommandGroup("Projetos", [][2]string{
 		{"konen projects", "lista os projetos cadastrados"},
-		{"konen project add [DIR]", "cadastra um projeto e suas abas"},
+		{"konen project add [DIR]", "cadastra um projeto, suas ações e abas"},
 		{"konen project edit NOME", "edita um projeto pelo assistente"},
 		{"konen project show NOME", "mostra o manifesto de um projeto"},
 		{"konen project trust NOME", "aprova os comandos após revisão"},
+		{"konen project run NOME AÇÃO", "executa uma ação nomeada pelo mise"},
 		{"konen dev [NOME] [--dry-run]", "abre ou inspeciona a sessão do projeto"},
 	})
 	a.printCommandGroup("Shell", [][2]string{

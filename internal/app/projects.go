@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/roqem/konen/internal/project"
@@ -15,7 +17,7 @@ import (
 
 func (a *App) runProject(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		return errors.New("informe uma ação: add, edit, list, show ou trust")
+		return errors.New("informe uma ação: add, edit, list, show, trust ou run")
 	}
 	stateDir, err := a.loadState()
 	if err != nil {
@@ -87,6 +89,8 @@ func (a *App) runProject(ctx context.Context, args []string) error {
 		return a.runProjectAdd(ctx, store, args[1:])
 	case "edit":
 		return a.runProjectEdit(ctx, store, args[1:])
+	case "run":
+		return a.runNamedProjectAction(ctx, args[1:], true)
 	default:
 		return fmt.Errorf("ação de projeto desconhecida: %s", args[0])
 	}
@@ -186,9 +190,19 @@ func (a *App) runProjectEdit(_ context.Context, store project.Store, args []stri
 		Name: name, Path: resolved, Shell: manifest.Shell,
 		KeepInvokingTab: manifest.KeepsInvokingTab(),
 	}
+	actionNames := make([]string, 0, len(manifest.Actions))
+	for actionName := range manifest.Actions {
+		actionNames = append(actionNames, actionName)
+	}
+	sort.Strings(actionNames)
+	for _, actionName := range actionNames {
+		answer.Actions = append(answer.Actions, ui.ProjectActionAnswer{
+			Name: actionName, Task: manifest.Actions[actionName].Task,
+		})
+	}
 	for _, tab := range manifest.Tabs {
 		answer.Tabs = append(answer.Tabs, ui.ProjectTabAnswer{
-			Title: tab.Title, Command: tab.Command, Hold: tab.Hold,
+			Title: tab.Title, Command: tab.Command, Action: tab.Action, Hold: tab.Hold,
 		})
 	}
 	answer, err = a.options.Prompter.Project(answer)
@@ -231,15 +245,150 @@ func (a *App) manifestFromAnswer(answer ui.ProjectAnswer) (project.Manifest, err
 	}
 	keepInvokingTab := answer.KeepInvokingTab
 	manifest := project.Manifest{
-		Version: 1, Path: portable, Shell: answer.Shell,
+		Version: 2, Path: portable, Shell: answer.Shell,
 		KeepInvokingTab: &keepInvokingTab,
+		Actions:         make(map[string]project.Action, len(answer.Actions)),
+	}
+	for _, action := range answer.Actions {
+		if _, exists := manifest.Actions[action.Name]; exists {
+			return project.Manifest{}, fmt.Errorf("ação repetida: %s", action.Name)
+		}
+		manifest.Actions[action.Name] = project.Action{Task: action.Task}
 	}
 	for _, tab := range answer.Tabs {
 		manifest.Tabs = append(manifest.Tabs, project.Tab{
-			Title: tab.Title, Command: tab.Command, Hold: tab.Hold,
+			Title: tab.Title, Command: tab.Command, Action: tab.Action, Hold: tab.Hold,
 		})
 	}
 	return manifest, project.Validate(manifest)
+}
+
+func (a *App) runNamedProjectAction(ctx context.Context, args []string, projectRequired bool) error {
+	positionals, dryRun, err := parseProjectActionArgs(args)
+	if err != nil {
+		return err
+	}
+	if projectRequired && len(positionals) != 2 {
+		return errors.New("uso: konen project run NOME AÇÃO [--dry-run]")
+	}
+	if !projectRequired && len(positionals) > 2 {
+		return errors.New("uso: konen run [PROJETO] AÇÃO [--dry-run]")
+	}
+	if !projectRequired && len(positionals) == 0 && !a.options.Interactive {
+		return errors.New("uso: konen run [PROJETO] AÇÃO [--dry-run]")
+	}
+
+	stateDir, err := a.loadState()
+	if err != nil {
+		return err
+	}
+	store := project.Store{StateDir: stateDir, HomeDir: a.options.HomeDir}
+	var projectName, actionName string
+	if len(positionals) == 2 {
+		projectName, actionName = positionals[0], positionals[1]
+	} else {
+		if len(positionals) == 1 {
+			actionName = positionals[0]
+		}
+		projectName, err = a.selectProject(store)
+		if err != nil {
+			return err
+		}
+	}
+	manifest, manifestPath, err := store.Load(projectName)
+	if err != nil {
+		return err
+	}
+	if actionName == "" {
+		actionName, err = a.options.Prompter.ChooseProjectAction(projectName, sortedActionNames(manifest))
+		if err != nil {
+			return err
+		}
+	}
+	action, ok := manifest.Actions[actionName]
+	if !ok {
+		return fmt.Errorf("o projeto %q não possui a ação %q%s", projectName, actionName, availableActions(manifest))
+	}
+	projectDir, err := store.ResolveProjectPath(manifest)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(projectDir)
+	if err != nil {
+		return fmt.Errorf("pasta do projeto indisponível: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("a pasta do projeto não é um diretório: %s", projectDir)
+	}
+	trusted, err := a.projectTrust().IsTrusted(manifestPath)
+	if err != nil {
+		return err
+	}
+	printProjectActionPlan(a.options.Out, projectName, projectDir, actionName, action.Task)
+	if dryRun {
+		if trusted {
+			fmt.Fprintln(a.options.Out, "Aprovação local: válida")
+		} else {
+			fmt.Fprintf(a.options.Out, "Aprovação local: pendente — revise e execute `konen project trust %s`\n", projectName)
+		}
+		fmt.Fprintln(a.options.Out, "Nenhuma tarefa foi executada.")
+		return nil
+	}
+	if !trusted {
+		return fmt.Errorf("as ações de %q ainda não foram aprovadas ou mudaram; revise com `konen project show %s` e execute `konen project trust %s`", projectName, projectName, projectName)
+	}
+	misePath, err := a.findCommand("mise")
+	if err != nil {
+		return errors.New("mise não foi encontrado; execute `konen doctor`")
+	}
+	if err := a.options.Runner.Run(ctx, projectDir, misePath, "run", "--raw", action.Task); err != nil {
+		return fmt.Errorf("a ação %q falhou: %w", actionName, err)
+	}
+	return nil
+}
+
+func parseProjectActionArgs(args []string) ([]string, bool, error) {
+	positionals := make([]string, 0, 2)
+	var dryRun bool
+	for _, arg := range args {
+		switch arg {
+		case "--dry-run":
+			dryRun = true
+		case "-h", "--help":
+			return nil, false, errors.New("uso: konen run [PROJETO] AÇÃO [--dry-run]")
+		default:
+			if strings.HasPrefix(arg, "-") {
+				return nil, false, fmt.Errorf("opção desconhecida: %s", arg)
+			}
+			positionals = append(positionals, arg)
+		}
+	}
+	return positionals, dryRun, nil
+}
+
+func printProjectActionPlan(out io.Writer, projectName, dir, actionName, task string) {
+	fmt.Fprintf(out, "Projeto: %s\nPasta: %s\n", projectName, dir)
+	fmt.Fprint(out, ui.RenderTable(
+		[]string{"Ação", "Tarefa do mise", "Execução"},
+		[][]string{{actionName, task, "mise run --raw " + task}},
+	))
+}
+
+func availableActions(manifest project.Manifest) string {
+	names := sortedActionNames(manifest)
+	if len(names) == 0 {
+		return "; nenhuma ação foi cadastrada"
+	}
+	return "; disponíveis: " + strings.Join(names, ", ")
+}
+
+func sortedActionNames(manifest project.Manifest) []string {
+	names := make([]string, 0, len(manifest.Actions))
+	for name := range manifest.Actions {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func (a *App) runDev(ctx context.Context, args []string) error {
@@ -348,6 +497,10 @@ func (a *App) launchInCurrentKitty(ctx context.Context, name, dir string, manife
 	if _, err := a.options.Runner.Output(ctx, dir, kitten, "@", "ls"); err != nil {
 		return fmt.Errorf("controle remoto do Kitty indisponível; execute diretamente em uma aba do Kitty e confirme `allow_remote_control yes` no kitty.conf: %w", err)
 	}
+	misePath, err := a.miseForProjectTabs(manifest)
+	if err != nil {
+		return err
+	}
 
 	shell := a.projectShell(manifest)
 	var firstWindowID string
@@ -361,10 +514,11 @@ func (a *App) launchInCurrentKitty(ctx context.Context, name, dir string, manife
 			launchArgs = append(launchArgs, "--hold")
 		}
 		launchArgs = append(launchArgs, shell)
-		if tab.Command == "" {
+		command := projectTabCommand(manifest, tab, misePath)
+		if command == "" {
 			launchArgs = append(launchArgs, "-l")
 		} else {
-			launchArgs = append(launchArgs, "-lic", tab.Command)
+			launchArgs = append(launchArgs, "-lic", command)
 		}
 		output, err := a.options.Runner.Output(ctx, dir, kitten, launchArgs...)
 		if err != nil {
@@ -395,6 +549,10 @@ func (a *App) launchKittySession(ctx context.Context, name, dir string, manifest
 	if err != nil {
 		return errors.New("Kitty não foi encontrado; execute `konen dev --dry-run` para revisar a sessão")
 	}
+	misePath, err := a.miseForProjectTabs(manifest)
+	if err != nil {
+		return err
+	}
 	file, err := os.CreateTemp("", "konen-*.kitty-session")
 	if err != nil {
 		return err
@@ -405,7 +563,7 @@ func (a *App) launchKittySession(ctx context.Context, name, dir string, manifest
 		file.Close()
 		return err
 	}
-	if _, err := file.WriteString(renderKittySession(dir, a.projectShell(manifest), manifest)); err != nil {
+	if _, err := file.WriteString(renderKittySession(dir, a.projectShell(manifest), misePath, manifest)); err != nil {
 		file.Close()
 		return err
 	}
@@ -429,6 +587,20 @@ func (a *App) projectShell(manifest project.Manifest) string {
 	return "/bin/sh"
 }
 
+func (a *App) miseForProjectTabs(manifest project.Manifest) (string, error) {
+	for _, tab := range manifest.Tabs {
+		if tab.Action == "" {
+			continue
+		}
+		misePath, err := a.findCommand("mise")
+		if err != nil {
+			return "", errors.New("uma aba usa uma ação, mas mise não foi encontrado; execute `konen doctor`")
+		}
+		return misePath, nil
+	}
+	return "", nil
+}
+
 func (a *App) projectTrust() project.TrustStore {
 	return project.TrustStore{Path: filepath.Join(filepath.Dir(a.options.ConfigPath), "projects-trust.toml")}
 }
@@ -447,9 +619,22 @@ func (a *App) printProjectPlan(name, dir string, manifest project.Manifest) {
 		}
 		fmt.Fprintf(a.options.Out, "Aba invocadora: %s\n", invokingTab)
 	}
+	if len(manifest.Actions) > 0 {
+		names := make([]string, 0, len(manifest.Actions))
+		for actionName := range manifest.Actions {
+			names = append(names, actionName)
+		}
+		sort.Strings(names)
+		rows := make([][]string, 0, len(names))
+		for _, actionName := range names {
+			rows = append(rows, []string{actionName, manifest.Actions[actionName].Task})
+		}
+		fmt.Fprintln(a.options.Out, "Ações nomeadas:")
+		fmt.Fprint(a.options.Out, ui.RenderTable([]string{"Ação", "Tarefa do mise"}, rows))
+	}
 	rows := make([][]string, 0, len(manifest.Tabs))
 	for _, tab := range manifest.Tabs {
-		command := tab.Command
+		command := projectTabDescription(manifest, tab)
 		if command == "" {
 			command = "<shell>"
 		}
@@ -462,7 +647,7 @@ func (a *App) printProjectPlan(name, dir string, manifest project.Manifest) {
 	fmt.Fprint(a.options.Out, ui.RenderTable([]string{"Aba", "Comando", "Após sair"}, rows))
 }
 
-func renderKittySession(dir, shell string, manifest project.Manifest) string {
+func renderKittySession(dir, shell, misePath string, manifest project.Manifest) string {
 	var output strings.Builder
 	for _, tab := range manifest.Tabs {
 		fmt.Fprintf(&output, "new_tab %s\n", shellQuote(tab.Title))
@@ -472,14 +657,29 @@ func renderKittySession(dir, shell string, manifest project.Manifest) string {
 			output.WriteString(" --hold")
 		}
 		fmt.Fprintf(&output, " %s", shellQuote(shell))
-		if tab.Command == "" {
+		command := projectTabCommand(manifest, tab, misePath)
+		if command == "" {
 			output.WriteString(" -l\n\n")
 		} else {
-			fmt.Fprintf(&output, " -lic %s\n\n", shellQuote(tab.Command))
+			fmt.Fprintf(&output, " -lic %s\n\n", shellQuote(command))
 		}
 	}
 	output.WriteString("focus_tab 0\n")
 	return output.String()
+}
+
+func projectTabDescription(manifest project.Manifest, tab project.Tab) string {
+	if tab.Action == "" {
+		return tab.Command
+	}
+	return fmt.Sprintf("ação %s → mise run --raw %s", tab.Action, manifest.Actions[tab.Action].Task)
+}
+
+func projectTabCommand(manifest project.Manifest, tab project.Tab, misePath string) string {
+	if tab.Action == "" {
+		return tab.Command
+	}
+	return fmt.Sprintf("%s run --raw %s", shellQuote(misePath), shellQuote(manifest.Actions[tab.Action].Task))
 }
 
 func shellQuote(value string) string {

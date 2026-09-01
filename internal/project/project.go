@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -14,19 +15,25 @@ import (
 	"github.com/roqem/konen/internal/compat"
 )
 
-const manifestVersion = 1
+const manifestVersion = 2
 
 type Manifest struct {
-	Version         int    `toml:"version"`
-	Path            string `toml:"path"`
-	Shell           string `toml:"shell,omitempty"`
-	KeepInvokingTab *bool  `toml:"keep_invoking_tab,omitempty"`
-	Tabs            []Tab  `toml:"tabs"`
+	Version         int               `toml:"version"`
+	Path            string            `toml:"path"`
+	Shell           string            `toml:"shell,omitempty"`
+	KeepInvokingTab *bool             `toml:"keep_invoking_tab,omitempty"`
+	Actions         map[string]Action `toml:"actions,omitempty"`
+	Tabs            []Tab             `toml:"tabs"`
+}
+
+type Action struct {
+	Task string `toml:"task"`
 }
 
 type Tab struct {
 	Title   string `toml:"title"`
 	Command string `toml:"command,omitempty"`
+	Action  string `toml:"action,omitempty"`
 	Hold    bool   `toml:"hold,omitempty"`
 }
 
@@ -105,7 +112,7 @@ func Decode(data []byte, path string) (Manifest, error) {
 	if version != manifestVersion {
 		return Manifest{}, fmt.Errorf("projeto incompatível em %s: %w", path, compat.VersionError{
 			Format: "o manifesto de projeto", Found: version, Current: manifestVersion,
-			Migratable: version == 0,
+			Migratable: version >= 0 && version < manifestVersion,
 		})
 	}
 	return decodeCurrent(data, path)
@@ -128,6 +135,8 @@ func PlanMigration(path string) (Migration, error) {
 		switch next {
 		case 0:
 			after, err = migrateZeroToOne(after, present)
+		case 1:
+			after, err = migrateOneToTwo(after)
 		default:
 			return Migration{}, fmt.Errorf("projeto incompatível em %s: %w", path, compat.VersionError{Format: "o manifesto de projeto", Found: next, Current: manifestVersion})
 		}
@@ -171,6 +180,14 @@ func migrateZeroToOne(data []byte, versionPresent bool) ([]byte, error) {
 		return nil, err
 	}
 	return updated, nil
+}
+
+func migrateOneToTwo(data []byte) ([]byte, error) {
+	pattern := regexp.MustCompile(`(?m)^([\t ]*version[\t ]*=[\t ]*)1([\t ]*(?:#.*)?)$`)
+	if matches := pattern.FindAllIndex(data, -1); len(matches) != 1 {
+		return nil, errors.New("o campo version = 1 não pôde ser localizado de forma inequívoca")
+	}
+	return pattern.ReplaceAll(data, []byte(`${1}2${2}`)), nil
 }
 
 func (s Store) Save(name string, manifest Manifest) (string, error) {
@@ -261,6 +278,14 @@ func Validate(manifest Manifest) error {
 	if containsLineBreak(manifest.Path) || containsLineBreak(manifest.Shell) {
 		return errors.New("path e shell devem ocupar uma única linha")
 	}
+	for name, action := range manifest.Actions {
+		if err := ValidateActionName(name); err != nil {
+			return err
+		}
+		if err := ValidateTaskName(action.Task); err != nil {
+			return fmt.Errorf("ação %q: %w", name, err)
+		}
+	}
 	if len(manifest.Tabs) == 0 {
 		return errors.New("defina ao menos uma aba")
 	}
@@ -270,14 +295,67 @@ func Validate(manifest Manifest) error {
 		if title == "" {
 			return fmt.Errorf("tabs[%d].title não pode ser vazio", index)
 		}
-		if containsLineBreak(tab.Title) || containsLineBreak(tab.Command) {
+		if containsLineBreak(tab.Title) || containsLineBreak(tab.Command) || containsLineBreak(tab.Action) {
 			return fmt.Errorf("tabs[%d] deve ocupar uma única linha", index)
+		}
+		if tab.Command != "" && tab.Action != "" {
+			return fmt.Errorf("tabs[%d] deve usar command ou action, não ambos", index)
+		}
+		if tab.Action != "" {
+			if err := ValidateActionName(tab.Action); err != nil {
+				return fmt.Errorf("tabs[%d]: %w", index, err)
+			}
+			if _, ok := manifest.Actions[tab.Action]; !ok {
+				return fmt.Errorf("tabs[%d] referencia a ação inexistente %q", index, tab.Action)
+			}
 		}
 		key := strings.ToLower(title)
 		if seen[key] {
 			return fmt.Errorf("título de aba repetido: %s", title)
 		}
 		seen[key] = true
+	}
+	return nil
+}
+
+func ValidateActionName(name string) error {
+	if name == "" {
+		return errors.New("o nome da ação não pode ser vazio")
+	}
+	first := true
+	for _, character := range name {
+		if first && !unicode.IsLetter(character) && !unicode.IsDigit(character) {
+			return fmt.Errorf("nome de ação inválido: %q", name)
+		}
+		first = false
+		if unicode.IsLetter(character) || unicode.IsDigit(character) || strings.ContainsRune("._:-", character) {
+			continue
+		}
+		return fmt.Errorf("nome de ação inválido: %q", name)
+	}
+	return nil
+}
+
+func ValidateTaskName(name string) error {
+	if name == "" {
+		return errors.New("a tarefa do mise não pode ser vazia")
+	}
+	if strings.HasPrefix(name, "-") {
+		return errors.New("a tarefa do mise não pode começar com hífen")
+	}
+	if strings.Contains(name, ":::") {
+		return errors.New("a tarefa do mise deve nomear uma única tarefa")
+	}
+	first := true
+	for _, character := range name {
+		if first && !unicode.IsLetter(character) && !unicode.IsDigit(character) {
+			return fmt.Errorf("tarefa do mise inválida: %q", name)
+		}
+		first = false
+		if unicode.IsLetter(character) || unicode.IsDigit(character) || strings.ContainsRune("._:/-", character) {
+			continue
+		}
+		return fmt.Errorf("tarefa do mise inválida: %q", name)
 	}
 	return nil
 }

@@ -26,8 +26,8 @@ func TestMigrateDryRunShowsAllFormatsAndChangesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, fragment := range []string{
-		"Configuração local", "projects/sample.toml", "v0", "v1", "migrar v0 → v1",
-		"--- ", "+version = 1", "Nenhum arquivo foi alterado",
+		"Configuração local", "projects/sample.toml", "v0", "v1", "v2", "migrar v0 → v2",
+		"--- ", "+version = 1", "+version = 2", "Nenhum arquivo foi alterado",
 	} {
 		if !strings.Contains(out.String(), fragment) {
 			t.Errorf("migration dry-run is missing %q:\n%s", fragment, out.String())
@@ -62,10 +62,11 @@ func TestMigrateAppliesAtomicallyBacksUpAndInvalidatesProjectTrust(t *testing.T)
 	if err := application.Run(context.Background(), []string{"migrate", "--yes"}); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{fixture.configPath, fixture.projectPath} {
-		if got := string(readTestFile(t, path)); !strings.HasPrefix(got, "version = 1\n") {
-			t.Fatalf("migrated file %s = %q", path, got)
-		}
+	if got := string(readTestFile(t, fixture.configPath)); !strings.HasPrefix(got, "version = 1\n") {
+		t.Fatalf("migrated config = %q", got)
+	}
+	if got := string(readTestFile(t, fixture.projectPath)); !strings.HasPrefix(got, "version = 2\n") {
+		t.Fatalf("migrated project = %q", got)
 	}
 	backupRoots, err := filepath.Glob(filepath.Join(filepath.Dir(fixture.configPath), "migration-backups", "*"))
 	if err != nil || len(backupRoots) != 1 {
@@ -93,11 +94,13 @@ func TestMigrateAppliesAtomicallyBacksUpAndInvalidatesProjectTrust(t *testing.T)
 
 func TestMigrateReportsCurrentFormatsWithoutCreatingBackup(t *testing.T) {
 	fixture := newLegacyMigrationFixture(t)
-	for _, path := range []string{fixture.configPath, fixture.projectPath} {
-		legacy := readTestFile(t, path)
-		if err := os.WriteFile(path, append([]byte("version = 1\n"), legacy...), 0o600); err != nil {
-			t.Fatal(err)
-		}
+	configLegacy := readTestFile(t, fixture.configPath)
+	if err := os.WriteFile(fixture.configPath, append([]byte("version = 1\n"), configLegacy...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	projectLegacy := readTestFile(t, fixture.projectPath)
+	if err := os.WriteFile(fixture.projectPath, append([]byte("version = 2\n"), projectLegacy...), 0o600); err != nil {
+		t.Fatal(err)
 	}
 	var out bytes.Buffer
 	application := New(Options{

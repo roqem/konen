@@ -14,10 +14,11 @@ responsibility. The boundary remains explicit enough to reconsider this if a
 real unsupported use case appears.
 
 Project sessions are the narrow exception to the no-private-format rule. A
-Konen project manifest expresses product behavior — project path, shell, tab
-titles and commands — that mise does not model. It lives under `projects/` in
-the central state repository, never as an arbitrary Kitty file in the source
-repository. Kitty remains the execution and layout engine.
+Konen project manifest expresses product behavior — project path, shell, named
+task aliases, tab titles and commands — that mise does not model. It lives
+under `projects/` in the central state repository, never as an arbitrary Kitty
+file in the source repository. Kitty remains the execution and layout engine;
+native mise project tasks remain the implementation of named actions.
 
 ## Compatibility boundary
 
@@ -111,6 +112,12 @@ approval.
   config directory. Manifests created or edited through the guided flow are
   approved as part of that explicit action. A clone, pull or manual edit changes
   the digest and requires `konen project trust NAME` before execution.
+- Named project actions map stable personal names to native mise task names.
+  `konen run` invokes mise directly with argv in the registered project
+  directory, while action-backed Kitty tabs render that same task invocation.
+  The manifest approval authorizes the mapping; mise's own trust still
+  authorizes the project configuration that implements the task. Dry runs call
+  neither layer and expose both the mapping and current manifest approval.
 
 ## Project and tool configuration
 
@@ -119,6 +126,10 @@ may support:
 
 - Kitty tabs belong in a Konen project manifest because they describe how the
   user opens a workspace.
+- Reusable build, test, console and coverage operations remain native tasks in
+  the project's `mise.toml`. A manifest may assign them personal action names
+  and reference those names from tabs, but never duplicates or hides the task
+  body.
 - User-wide Kitty, Neovim and shell settings belong in `home/` and are managed
   by mise like other dotfiles.
 - The state `mise.toml` is linked as mise's global user config. This makes
