@@ -145,6 +145,7 @@ func TestFirstRunJourneyThroughBuiltExecutable(t *testing.T) {
 	konen := filepath.Join(binDir, "konen")
 	buildKonen(t, konen, "journey-test")
 	miseLog := filepath.Join(root, "mise.log")
+	applyMarker := filepath.Join(root, "mise-applied")
 	writeExecutable(t, filepath.Join(binDir, "mise"), `#!/bin/sh
 set -eu
 printf '%s\n' "$*" >> "$KONEN_TEST_MISE_LOG"
@@ -159,10 +160,22 @@ if [ "${1:-}" = "--version" ]; then
 fi
 case " $* " in
   *" bootstrap status --json "*)
-    printf '%s\n' '{"tools":[{"tool":"go","requested_version":"1.27.0","resolved_version":"1.27.0","state":"installed","installed":true}]}'
+    if [ -f "$KONEN_TEST_APPLY_MARKER" ]; then
+      printf '%s\n' '{"tools":[{"tool":"go","requested_version":"1.27.0","resolved_version":"1.27.0","state":"installed","installed":true}]}'
+    else
+      printf '%s\n' '{"tools":[{"tool":"go","requested_version":"1.27.0","resolved_version":"1.27.0","state":"missing","installed":false}]}'
+    fi
     ;;
   *" bootstrap --dry-run "*|*" bootstrap --only task --dry-run "*)
     printf 'fixture apply: dry run\n'
+    ;;
+  *" bootstrap --yes "*)
+    if [ -f "$KONEN_TEST_APPLY_MARKER" ]; then
+      printf 'fixture apply: go already ready\n'
+    else
+      : > "$KONEN_TEST_APPLY_MARKER"
+      printf 'fixture apply: changed go\n'
+    fi
     ;;
   " trust "*)
     ;;
@@ -174,12 +187,13 @@ esac
 `)
 
 	environment := testEnvironment(map[string]string{
-		"HOME":                home,
-		"XDG_CONFIG_HOME":     configDir,
-		"PATH":                binDir + ":/usr/bin:/bin",
-		"SHELL":               "/bin/sh",
-		"TMPDIR":              tempDir,
-		"KONEN_TEST_MISE_LOG": miseLog,
+		"HOME":                    home,
+		"XDG_CONFIG_HOME":         configDir,
+		"PATH":                    binDir + ":/usr/bin:/bin",
+		"SHELL":                   "/bin/sh",
+		"TMPDIR":                  tempDir,
+		"KONEN_TEST_MISE_LOG":     miseLog,
+		"KONEN_TEST_APPLY_MARKER": applyMarker,
 	})
 
 	output := runCommand(t, root, environment, konen, "init", "--git", stateDir)
@@ -205,7 +219,7 @@ esac
 
 	output = runCommand(t, root, environment, konen, "status")
 	for _, fragment := range []string{
-		"Tipo", "Ferramenta", "go", "1.27.0", "instalado",
+		"Tipo", "Ferramenta", "go", "1.27.0", "ausente",
 		"Backup Git", "Primeiro commit", "pendente", "Remoto", "ausente",
 		"git -C", "diff --cached", "gh repo create", "nenhum desses comandos foi executado",
 	} {
@@ -221,6 +235,26 @@ esac
 	assertContains(t, output, "fixture apply: dry run")
 	output = runCommand(t, root, environment, konen, "apply", "--dry-run")
 	assertContains(t, output, "fixture apply: dry run")
+	if _, err := os.Stat(applyMarker); !os.IsNotExist(err) {
+		t.Fatalf("dry-run applied the fixture: %v", err)
+	}
+	output = runCommand(t, root, environment, konen, "apply", "--yes")
+	for _, fragment := range []string{
+		"fixture apply: changed go", "Resumo do apply", "Convergiram nesta execução",
+		"Ferramenta: 1", "Estado declarativo", "convergido",
+	} {
+		assertContains(t, output, fragment)
+	}
+	if _, err := os.Stat(applyMarker); err != nil {
+		t.Fatalf("real fixture apply did not run: %v", err)
+	}
+	output = runCommand(t, root, environment, konen, "apply", "--yes")
+	for _, fragment := range []string{
+		"fixture apply: go already ready", "Convergiram nesta execução", "Já estavam prontos",
+		"Ferramenta: 1",
+	} {
+		assertContains(t, output, fragment)
+	}
 
 	installerMarker := filepath.Join(root, "installer-was-run")
 	installerSource := filepath.Join(root, "install-noop")
@@ -304,13 +338,11 @@ hold = true
 		"trust " + filepath.Join(stateDir, "mise.toml"),
 		"bootstrap status --json",
 		"bootstrap --dry-run",
+		"bootstrap --yes",
 	} {
 		assertContains(t, log, invocation)
 	}
 	assertContains(t, log, "state-env="+filepath.Join(stateDir, "mise.toml")+"|"+stateDir+"|"+stateDir+"|mise.toml")
-	if strings.Contains(log, "bootstrap --yes") {
-		t.Fatalf("journey unexpectedly applied host changes:\n%s", log)
-	}
 }
 
 type latestRelease struct {

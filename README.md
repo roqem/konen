@@ -35,7 +35,7 @@ selecionadas automaticamente:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.12 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.13 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -251,6 +251,21 @@ konen apply --only tools,dotfiles
 Durante essas operações, o Konen limita o mise ao estado atualmente
 configurado. Uma configuração global anterior ou arquivos de versão encontrados
 em pastas ancestrais não são misturados ao plano.
+
+Depois de um `apply` bem-sucedido, o Konen consulta o estado estruturado antes e
+depois da aplicação e resume:
+
+- quais recursos convergiram naquela execução;
+- quais já estavam prontos;
+- o que ainda está pendente, inclusive em etapas não selecionadas;
+- se a tarefa `bootstrap` apenas terminou sem erro, sem fingir que uma tarefa
+  idempotente possui estado convergente;
+- ações observáveis, como iniciar uma nova sessão após mudar o shell de login.
+
+Instaladores pessoais continuam responsáveis por imprimir instruções próprias,
+como autenticação ou reinício. O resumo manda revisar essas mensagens. Se uma
+tarefa alterar a superfície executável do estado durante o `apply`, o Konen não
+faz a consulta posterior: exige nova revisão com `konen trust`.
 
 ### Pacotes do sistema
 
@@ -584,9 +599,10 @@ aprovação local separada; uma edição ou pull exige
 | `konen doctor` | Diagnostica instalação, estado, confiança, mise e Git. |
 | `konen completion SHELL` | Gera autocomplete para Zsh, Bash ou Fish. |
 
-Repetir `apply` é parte normal do fluxo. Recursos já convergidos são ignorados;
-instaladores pessoais idempotentes são chamados, verificam o estado e saem sem
-refazer trabalho.
+Repetir `apply` é parte normal do fluxo. O resumo distingue recursos que já
+estavam prontos de tarefas pessoais: recursos convergidos são ignorados;
+instaladores idempotentes são chamados, verificam o estado e saem sem refazer
+trabalho.
 
 ## Autocomplete
 

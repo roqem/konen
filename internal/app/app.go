@@ -276,7 +276,42 @@ func (a *App) runApply(ctx context.Context, args []string) error {
 	if *dryRun {
 		miseArgs = append(miseArgs, "--dry-run")
 	}
-	return a.runMise(ctx, miseArgs)
+	if *dryRun {
+		return a.runMise(ctx, miseArgs)
+	}
+
+	stateDir, misePath, err := a.loadTrustedMise(ctx)
+	if err != nil {
+		return err
+	}
+	before, beforeErr := a.queryMiseStatusRows(ctx, stateDir, misePath)
+	taskRan := taskWillRun(stateDir, only)
+	miseCommand := append([]string{"-C", stateDir}, miseArgs...)
+	if err := a.options.Runner.RunEnv(
+		ctx, stateDir, miseStateEnvironment(stateDir), misePath, miseCommand...,
+	); err != nil {
+		return fmt.Errorf("mise: %w", err)
+	}
+
+	trusted, trustErr := a.stateTrust().IsTrusted(stateDir)
+	if trustErr != nil {
+		fmt.Fprintln(a.options.Out, "\nApply concluído, mas a aprovação local não pôde ser validada depois da aplicação.")
+		fmt.Fprintln(a.options.Out, "Execute `konen doctor` antes de uma nova operação; o resumo pós-apply não invocou o mise novamente.")
+		return nil
+	}
+	if !trusted {
+		fmt.Fprintln(a.options.Out, "\nApply concluído, mas o estado executável mudou durante a aplicação.")
+		fmt.Fprintln(a.options.Out, "Revise as mudanças e execute `konen trust`; o resumo pós-apply não invocou o mise novamente.")
+		return nil
+	}
+	after, afterErr := a.queryMiseStatusRows(ctx, stateDir, misePath)
+	if beforeErr != nil || afterErr != nil {
+		fmt.Fprintln(a.options.Out, "\nApply concluído, mas o resumo estruturado não pôde ser gerado.")
+		fmt.Fprintln(a.options.Out, "Execute `konen status` para conferir o estado atual.")
+		return nil
+	}
+	fmt.Fprint(a.options.Out, renderApplySummary(buildApplySummary(before, after, only, taskRan)))
+	return nil
 }
 
 func (a *App) runDotfile(ctx context.Context, args []string) error {

@@ -28,7 +28,13 @@ repository. Kitty remains the execution and layout engine.
   backup section in `status` uses read-only queries, suppresses optional index
   writes and repository fsmonitor execution, and displays remote names rather
   than potentially credential-bearing URLs.
-- `apply` delegates confirmation and convergence to mise.
+- `apply` delegates confirmation and convergence to mise. For a successful real
+  application, Konen compares mise's stable JSON status before and after, then
+  reports changed, already-converged and remaining resources. It never infers
+  success by parsing human logs. Native bootstrap tasks are reported separately
+  as completed without error because idempotent tasks do not expose convergent
+  state. If executable-surface approval changes during the run, Konen does not
+  invoke mise again and requires a new review.
 - `status` exposes the complete declared state and `plan` exposes pending
   mutations before `apply`; Konen must not maintain a hidden install list.
 - All Konen lists use one lightweight table renderer. `status` consumes mise's

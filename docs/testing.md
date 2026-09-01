@@ -15,8 +15,10 @@ Linux integration journeys:
   installs Konen and mise into a temporary home, upgrades Konen without losing
   state, rejects a corrupted archive and proves that `sudo` was not invoked;
 - a built Konen executable runs `init --git`, `doctor`, `status`, `plan`,
-  `apply --dry-run`, completion generation and the project inspection/trust
-  workflow with temporary configuration, state, home and backend binaries;
+  `apply --dry-run`, a real apply against a stateful fake backend, completion
+  generation and the project inspection/trust workflow with temporary
+  configuration, state, home and backend binaries; the real apply must compare
+  structured status and summarize the resource that changed;
 - unit journeys prove that public GitHub state does not trigger authentication,
   while a failed private HTTPS clone uses device login and a repository-scoped
   helper without creating SSH keys or changing global Git configuration.
@@ -27,7 +29,7 @@ uses the developer's home directory.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.12` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.13` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -44,7 +46,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.12 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.13 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -78,6 +80,7 @@ konen plan --only packages
 konen plan --only tools,dotfiles
 konen apply --dry-run
 konen apply
+konen apply --yes
 konen status
 git -C ~/.local/share/konen/state status --short
 ```
@@ -102,7 +105,13 @@ Expected results:
 - dry runs use only the selected state, without merging a previously linked
   global config or ancestor version files;
 - `--only tools,dotfiles` limits the plan to those bootstrap phases;
-- the real apply converges successfully inside the disposable VM;
+- the first real apply converges successfully and its structured summary
+  separates resources changed now, resources already ready and remaining
+  actions;
+- the immediate reapplication reports declarative resources under `Já estavam
+  prontos`; it does not claim they changed twice;
+- selected personal tasks, when present, are reported separately as completed
+  without error and point back to their own output for manual instructions;
 - the final status has no unexpected pending resources;
 - the state is an ordinary Git repository, Konen explains that it did not
   commit anything, and its initial files are visible as untracked.

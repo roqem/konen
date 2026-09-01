@@ -159,7 +159,28 @@ func TestInitAndApply(t *testing.T) {
 	root := t.TempDir()
 	stateDir := filepath.Join(root, "state")
 	configPath := filepath.Join(root, "config", "config.toml")
-	runner := &fakeRunner{paths: map[string]string{"mise": "/bin/mise", "git": "/bin/git"}}
+	applied := false
+	runner := &fakeRunner{
+		paths: map[string]string{"mise": "/bin/mise", "git": "/bin/git"},
+		outputHook: func(call runCall) (string, error) {
+			if strings.Join(call.args, " ") == "-C "+stateDir+" bootstrap status --json" {
+				state := "missing"
+				installed := "false"
+				if applied {
+					state = "installed"
+					installed = "true"
+				}
+				return `{"tools":[{"tool":"go","state":"` + state + `","installed":` + installed + `}]}`, nil
+			}
+			return "", errors.New("unexpected output call")
+		},
+		runHook: func(call runCall) error {
+			if strings.Contains(" "+strings.Join(call.args, " ")+" ", " bootstrap --yes ") {
+				applied = true
+			}
+			return nil
+		},
+	}
 	var out bytes.Buffer
 	application := New(Options{
 		ConfigPath: configPath,
@@ -183,7 +204,7 @@ func TestInitAndApply(t *testing.T) {
 		name:        "/bin/mise",
 		args:        []string{"-C", stateDir, "bootstrap", "--yes"},
 	}
-	if len(runner.runs) != 3 || !reflect.DeepEqual(runner.runs[2], want) {
+	if len(runner.runs) != 5 || !reflect.DeepEqual(runner.runs[3], want) {
 		t.Fatalf("runs = %#v, want final call %#v", runner.runs, want)
 	}
 	wantTrust := runCall{
@@ -199,6 +220,11 @@ func TestInitAndApply(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "O Konen não cria commits") {
 		t.Fatalf("init output does not explain Git ownership: %q", out.String())
+	}
+	for _, fragment := range []string{"Resumo do apply", "Convergiram nesta execução", "Ferramenta: 1"} {
+		if !strings.Contains(out.String(), fragment) {
+			t.Fatalf("apply output is missing %q: %s", fragment, out.String())
+		}
 	}
 }
 

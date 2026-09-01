@@ -56,16 +56,16 @@ nativo do mise, sem manifesto paralelo do Konen.
 
 Objetivo: tornar manutenção e atualização tão claras quanto o primeiro uso.
 
-- resumir ao final do `apply` o que mudou e quais ações manuais restaram;
-- distinguir melhor recursos convergidos de tarefas idempotentes sempre
+- [x] resumir ao final do `apply` o que mudou e quais ações manuais restaram;
+- [x] distinguir melhor recursos convergidos de tarefas idempotentes sempre
   selecionadas;
-- oferecer filtros de status para itens ausentes, diferentes ou por categoria;
-- projetar atualização explícita do Konen e do mise, com versão e plano
+- [ ] oferecer filtros de status para itens ausentes, diferentes ou por categoria;
+- [ ] projetar atualização explícita do Konen e do mise, com versão e plano
   visíveis;
-- definir migrações compatíveis para qualquer mudança futura do estado;
-- modelar ações nomeadas de projeto, como preparar, testar, abrir console ou
+- [ ] definir migrações compatíveis para qualquer mudança futura do estado;
+- [ ] modelar ações nomeadas de projeto, como preparar, testar, abrir console ou
   gerar cobertura, sem transformá-las em funções escondidas do Konen;
-- permitir que abas reutilizem essas ações em vez de duplicar comandos longos.
+- [ ] permitir que abas reutilizem essas ações em vez de duplicar comandos longos.
 
 Critério de conclusão: o usuário entende o resultado de cada aplicação, atualiza
 o produto conscientemente e mantém rotinas de projeto no estado central sem

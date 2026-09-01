@@ -20,6 +20,7 @@ type statusRow struct {
 	item          string
 	configuration string
 	state         string
+	part          string
 }
 
 func (a *App) runStatus(ctx context.Context, args []string) error {
@@ -51,23 +52,9 @@ func formatMiseStatus(data []byte) (string, error) {
 }
 
 func formatMiseStatusWithState(data []byte, stateDir string) (string, error) {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	var root map[string]any
-	if err := decoder.Decode(&root); err != nil {
+	rows, err := parseMiseStatusRows(data, stateDir)
+	if err != nil {
 		return "", err
-	}
-
-	var rows []statusRow
-	for _, key := range orderedKeys(root, statusRootOrder) {
-		collectStatusRows([]string{key}, root[key], &rows)
-	}
-	if stateDir != "" {
-		personal, err := personalScriptRows(stateDir)
-		if err != nil {
-			return "", err
-		}
-		rows = append(rows, personal...)
 	}
 	if len(rows) == 0 {
 		return "Nenhum item declarado no estado.\n", nil
@@ -78,6 +65,28 @@ func formatMiseStatusWithState(data []byte, stateDir string) (string, error) {
 		tableRows = append(tableRows, []string{row.kind, row.item, row.configuration, row.state})
 	}
 	return ui.RenderTable([]string{"Tipo", "Item", "Configuração", "Estado"}, tableRows), nil
+}
+
+func parseMiseStatusRows(data []byte, stateDir string) ([]statusRow, error) {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	var root map[string]any
+	if err := decoder.Decode(&root); err != nil {
+		return nil, err
+	}
+
+	var rows []statusRow
+	for _, key := range orderedKeys(root, statusRootOrder) {
+		collectStatusRows([]string{key}, root[key], &rows)
+	}
+	if stateDir != "" {
+		personal, err := personalScriptRows(stateDir)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, personal...)
+	}
+	return rows, nil
 }
 
 func personalScriptRows(stateDir string) ([]statusRow, error) {
@@ -105,7 +114,7 @@ func personalScriptRows(stateDir string) ([]statusRow, error) {
 			name := strings.TrimPrefix(relative, "scripts/bin/")
 			rows = append(rows, statusRow{
 				kind: "Comando pessoal", item: name,
-				configuration: "Fonte: " + relative, state: declaredState,
+				configuration: "Fonte: " + relative, state: declaredState, part: "task",
 			})
 		default:
 			name, ok := state.TaskName(relative)
@@ -118,7 +127,7 @@ func personalScriptRows(stateDir string) ([]statusRow, error) {
 			}
 			rows = append(rows, statusRow{
 				kind: kind, item: name,
-				configuration: "Fonte: " + relative, state: declaredState,
+				configuration: "Fonte: " + relative, state: declaredState, part: "task",
 			})
 		}
 	}
@@ -166,6 +175,7 @@ func collectStatusRows(path []string, value any, rows *[]statusRow) {
 			item:          humanize(path[len(path)-1]),
 			configuration: statusValue(typed),
 			state:         "—",
+			part:          statusApplyPart(path),
 		})
 	}
 }
@@ -231,6 +241,23 @@ func statusRecord(path []string, record map[string]any, fallback string) statusR
 	}
 	return statusRow{
 		kind: statusKind(path), item: item, configuration: configuration, state: state,
+		part: statusApplyPart(path),
+	}
+}
+
+func statusApplyPart(path []string) string {
+	if len(path) == 0 {
+		return ""
+	}
+	switch path[0] {
+	case "packages", "repos", "dotfiles", "tools":
+		return path[0]
+	case "plugin_deps":
+		return "tools"
+	case "login_shell":
+		return "user"
+	default:
+		return path[0]
 	}
 }
 
