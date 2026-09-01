@@ -29,3 +29,22 @@ func TestApplyPartsFieldRendersASingleOption(t *testing.T) {
 		t.Fatalf("single-option selector rendered an empty viewport:\n%s", view)
 	}
 }
+
+func TestProjectActionFieldsRejectIncompleteAndAmbiguousValues(t *testing.T) {
+	if err := validateProjectTask(""); err == nil || !strings.Contains(err.Error(), "não pode ser vazia") {
+		t.Fatalf("empty task error = %v", err)
+	}
+	if err := validateProjectActionName(nil)("test"); err != nil {
+		t.Fatalf("valid action name error = %v", err)
+	}
+	if err := validateProjectActionName([]ProjectActionAnswer{{Name: "test"}})("test"); err == nil {
+		t.Fatal("duplicate action name was accepted")
+	}
+	if err := validateTabAction([]ProjectActionAnswer{{Name: "test"}})("missing"); err == nil {
+		t.Fatal("unknown tab action was accepted")
+	}
+	action := "test"
+	if err := validateDirectCommand(&action)("go test ./..."); err == nil || !strings.Contains(err.Error(), "não ambos") {
+		t.Fatalf("action plus command error = %v", err)
+	}
+}

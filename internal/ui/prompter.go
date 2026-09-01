@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"charm.land/huh/v2"
+	"github.com/roqem/konen/internal/project"
 )
 
 type InitAnswer struct {
@@ -435,11 +436,15 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 	for index, existing := range answer.Actions {
 		keep := true
 		form := huh.NewForm(huh.NewGroup(
-			huh.NewInput().Title(fmt.Sprintf("Ação %d — nome", index+1)).Value(&existing.Name),
+			huh.NewInput().
+				Title(fmt.Sprintf("Ação %d — nome", index+1)).
+				Value(&existing.Name).
+				Validate(validateProjectActionName(actions)),
 			huh.NewInput().
 				Title("Tarefa do mise").
 				Description("Nome declarado pelo projeto, como test, dev ou db:console.").
-				Value(&existing.Task),
+				Value(&existing.Task).
+				Validate(validateProjectTask),
 			huh.NewConfirm().
 				Title("Manter esta ação?").
 				Affirmative("Sim").Negative("Remover").Value(&keep),
@@ -471,11 +476,13 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 			huh.NewInput().
 				Title("Nome curto da ação").
 				Description("Exemplos: test, console ou coverage.").
-				Value(&action.Name),
+				Value(&action.Name).
+				Validate(validateProjectActionName(actions)),
 			huh.NewInput().
 				Title("Tarefa do mise").
 				Description("A tarefa continua definida no mise.toml do projeto.").
-				Value(&action.Task),
+				Value(&action.Task).
+				Validate(validateProjectTask),
 			huh.NewConfirm().
 				Title("Adicionar outra ação?").
 				Affirmative("Sim").Negative("Não").Value(&addAction),
@@ -492,15 +499,20 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 	for index, existing := range answer.Tabs {
 		keep := true
 		fields := []huh.Field{
-			huh.NewInput().Title(fmt.Sprintf("Aba %d — título", index+1)).Value(&existing.Title),
+			huh.NewInput().
+				Title(fmt.Sprintf("Aba %d — título", index+1)).
+				Value(&existing.Title).
+				Validate(validateRequired("o título da aba não pode ser vazio")),
 			huh.NewInput().
 				Title("Ação nomeada (opcional)").
 				Description("Use uma ação cadastrada acima; vazio permite um comando direto.").
-				Value(&existing.Action),
+				Value(&existing.Action).
+				Validate(validateTabAction(actions)),
 			huh.NewInput().
 				Title("Comando direto (opcional)").
 				Description("Use somente se a ação estiver vazia; ambos vazios abrem o shell.").
-				Value(&existing.Command),
+				Value(&existing.Command).
+				Validate(validateDirectCommand(&existing.Action)),
 			huh.NewConfirm().
 				Title("Manter aberta quando o comando terminar?").
 				Affirmative("Sim").Negative("Não").Value(&existing.Hold),
@@ -538,15 +550,20 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 		}
 		addAnother = false
 		form := huh.NewForm(huh.NewGroup(
-			huh.NewInput().Title("Título da aba").Value(&tab.Title),
+			huh.NewInput().
+				Title("Título da aba").
+				Value(&tab.Title).
+				Validate(validateRequired("o título da aba não pode ser vazio")),
 			huh.NewInput().
 				Title("Ação nomeada (opcional)").
 				Description("Use uma ação cadastrada acima; vazio permite um comando direto.").
-				Value(&tab.Action),
+				Value(&tab.Action).
+				Validate(validateTabAction(actions)),
 			huh.NewInput().
 				Title("Comando direto (opcional)").
 				Description("Use somente se a ação estiver vazia; ambos vazios abrem o shell.").
-				Value(&tab.Command),
+				Value(&tab.Command).
+				Validate(validateDirectCommand(&tab.Action)),
 			huh.NewConfirm().
 				Title("Manter aberta quando o comando terminar?").
 				Affirmative("Sim").Negative("Não").Value(&tab.Hold),
@@ -569,6 +586,58 @@ func (p HuhPrompter) Project(answer ProjectAnswer) (ProjectAnswer, error) {
 	answer.Actions = actions
 	answer.Tabs = tabs
 	return answer, nil
+}
+
+func validateProjectActionName(existing []ProjectActionAnswer) func(string) error {
+	return func(value string) error {
+		value = strings.TrimSpace(value)
+		if err := project.ValidateActionName(value); err != nil {
+			return err
+		}
+		for _, action := range existing {
+			if action.Name == value {
+				return fmt.Errorf("a ação %q já existe", value)
+			}
+		}
+		return nil
+	}
+}
+
+func validateProjectTask(value string) error {
+	return project.ValidateTaskName(strings.TrimSpace(value))
+}
+
+func validateRequired(message string) func(string) error {
+	return func(value string) error {
+		if strings.TrimSpace(value) == "" {
+			return errors.New(message)
+		}
+		return nil
+	}
+}
+
+func validateTabAction(actions []ProjectActionAnswer) func(string) error {
+	return func(value string) error {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return nil
+		}
+		for _, action := range actions {
+			if action.Name == value {
+				return nil
+			}
+		}
+		return fmt.Errorf("a ação %q não foi cadastrada acima", value)
+	}
+}
+
+func validateDirectCommand(action *string) func(string) error {
+	return func(value string) error {
+		if strings.TrimSpace(value) != "" && strings.TrimSpace(*action) != "" {
+			return errors.New("use uma ação ou um comando direto, não ambos")
+		}
+		return nil
+	}
 }
 
 func defaultProjectTab() ProjectTabAnswer {
