@@ -27,7 +27,7 @@ uses the developer's home directory.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.11` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.12` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -44,7 +44,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.11 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.12 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -85,6 +85,9 @@ git -C ~/.local/share/konen/state status --short
 Expected results:
 
 - `doctor` recognizes the co-installed mise and the state directory;
+- `status` reports the pending first Git commit and missing remote, shows the
+  manual review/commit/private-remote commands and explicitly says it ran none
+  of them;
 - the initial selector displays its single `Dotfiles` option instead of an
   empty list;
 - the guided tool dry run displays the exact `mise.toml` diff without writing

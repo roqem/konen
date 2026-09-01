@@ -204,8 +204,18 @@ esac
 	assertContains(t, output, "✓ git:")
 
 	output = runCommand(t, root, environment, konen, "status")
-	for _, fragment := range []string{"Tipo", "Ferramenta", "go", "1.27.0", "instalado"} {
+	for _, fragment := range []string{
+		"Tipo", "Ferramenta", "go", "1.27.0", "instalado",
+		"Backup Git", "Primeiro commit", "pendente", "Remoto", "ausente",
+		"git -C", "diff --cached", "gh repo create", "nenhum desses comandos foi executado",
+	} {
 		assertContains(t, output, fragment)
+	}
+	if _, err := runCommandError(stateDir, environment, "git", "rev-parse", "--verify", "HEAD"); err == nil {
+		t.Fatal("status created the first Git commit")
+	}
+	if remotes := strings.TrimSpace(runCommand(t, stateDir, environment, "git", "remote")); remotes != "" {
+		t.Fatalf("status created a Git remote: %q", remotes)
 	}
 	output = runCommand(t, root, environment, konen, "plan")
 	assertContains(t, output, "fixture apply: dry run")

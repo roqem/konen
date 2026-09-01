@@ -35,7 +35,7 @@ selecionadas automaticamente:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.11 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.12 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -94,7 +94,8 @@ konen apply
 Esses comandos fazem o seguinte:
 
 1. `init` cria a estrutura inicial e, com `--git`, inicia um repositório Git;
-2. `status` compara o que foi declarado com o que existe na máquina;
+2. `status` compara o que foi declarado com o que existe na máquina e mostra a
+   situação do backup Git;
 3. `plan` mostra o que uma aplicação faria, sem alterar nada;
 4. `apply` pede confirmação e aproxima a máquina do estado declarado.
 
@@ -480,6 +481,18 @@ O guia técnico, incluindo a fronteira exata de confiança, está em
 O backup é o próprio repositório do estado. Antes do primeiro commit, confirme
 que não há senhas, tokens, chaves privadas, `.env` ou dados específicos que não
 deveriam sair da máquina:
+
+```console
+konen status
+```
+
+A seção `Backup Git` informa se o repositório foi iniciado, se o primeiro
+commit ainda está pendente, se há mudanças locais e quais remotos existem.
+Quando algo falta, ela mostra os próximos comandos, mas não executa nenhum
+deles. Endereços de remotos não são exibidos, pois podem conter informações de
+autenticação.
+
+O fluxo manual indicado continua sendo:
 
 ```console
 cd ~/home

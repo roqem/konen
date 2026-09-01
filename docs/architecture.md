@@ -24,7 +24,10 @@ repository. Kitty remains the execution and layout engine.
 - State remains a normal directory and may be a normal Git repository.
 - Its directory and repository name are user-selected; Konen stores the
   resolved path instead of assigning product meaning to a name.
-- Konen never commits or pushes automatically.
+- Konen never stages, commits, creates remotes or pushes automatically. The Git
+  backup section in `status` uses read-only queries, suppresses optional index
+  writes and repository fsmonitor execution, and displays remote names rather
+  than potentially credential-bearing URLs.
 - `apply` delegates confirmation and convergence to mise.
 - `status` exposes the complete declared state and `plan` exposes pending
   mutations before `apply`; Konen must not maintain a hidden install list.

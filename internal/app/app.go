@@ -215,6 +215,9 @@ func (a *App) runInit(ctx context.Context, args []string) error {
 	fmt.Fprintf(a.options.Out, "Konen configurado. Estado: %s\n", resolved)
 	if answer.Remote == "" && gitEnabled {
 		fmt.Fprintln(a.options.Out, "Git ativo. O Konen não cria commits; revise e versione as mudanças quando estiver pronto.")
+		if createdLocalConfig {
+			fmt.Fprintln(a.options.Out, "Backup Git: primeiro commit e remoto ainda pendentes; `konen status` mostra a orientação.")
+		}
 	}
 	switch {
 	case trusted:

@@ -42,6 +42,7 @@ func (a *App) runStatus(ctx context.Context, args []string) error {
 		return fmt.Errorf("status do mise inválido: %w", err)
 	}
 	fmt.Fprint(a.options.Out, formatted)
+	fmt.Fprint(a.options.Out, renderGitBackup(a.inspectGitBackup(ctx, stateDir), stateDir))
 	return nil
 }
 

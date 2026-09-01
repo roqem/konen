@@ -44,7 +44,7 @@ TOML, mantendo o `mise.toml` resultante simples e totalmente editável.
   comandos de instalação não revisados;
 - [x] mostrar o diff do arquivo que será alterado;
 - [x] atualizar a confiança após uma mutação feita pelo assistente;
-- [ ] orientar a criação do primeiro commit e avisar quando o estado ainda não tem
+- [x] orientar a criação do primeiro commit e avisar quando o estado ainda não tem
   remoto, sem fazer commit ou push automaticamente.
 
 Critério de conclusão: uma pessoa iniciante consegue adicionar uma ferramenta,
