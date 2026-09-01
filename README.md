@@ -35,7 +35,7 @@ selecionadas automaticamente:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.13 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.14 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -222,6 +222,33 @@ ruby = "3.4"
 `latest` acompanha a versão mais recente; uma versão como `3.4` limita a
 atualização à família escolhida. `konen status` mostra a versão pedida, a versão
 resolvida e se ela já está instalada.
+
+### Filtrando o status
+
+O status completo é útil para auditoria. Na rotina diária, ele pode ser reduzido
+por categoria, situação ou pelas duas ao mesmo tempo:
+
+```console
+konen status --only tools,dotfiles
+konen status --state pending
+konen status --state missing,different
+konen status --only tools --state missing
+```
+
+As categorias são `packages`, `repos`, `dotfiles`, `tools`, `task` e `user`.
+As situações têm significado estável:
+
+| Situação | Inclui |
+|---|---|
+| `ready` | Recursos já convergidos e comandos pessoais disponíveis. |
+| `pending` | Tudo que exige aplicação ou correção conhecida. |
+| `missing` | Recursos ausentes, inclusive dotfiles cuja fonte não existe. |
+| `different` | Recursos existentes que diferem do estado declarado. |
+| `unknown` | Estados novos que o Konen ainda não classifica. |
+
+Valores separados por vírgula são combinados. Categoria e situação funcionam
+em conjunto. A orientação de `Backup Git` aparece apenas no status completo,
+para não misturar recursos fora do filtro.
 
 ### Escolhendo o que aplicar
 
@@ -577,6 +604,8 @@ aprovação local separada; uma edição ou pull exige
 |---|---|
 | `konen` | Abre o menu interativo. |
 | `konen status` | Mostra o que existe, falta ou está diferente. |
+| `konen status --only tools,dotfiles` | Mostra somente as categorias informadas. |
+| `konen status --state missing,different` | Mostra recursos ausentes ou diferentes. |
 | `konen plan` | Simula a aplicação completa sem alterar a máquina. |
 | `konen plan --select` | Escolhe por checkboxes quais etapas entram no plano. |
 | `konen diff` | Mostra diferenças nos dotfiles gerenciados. |

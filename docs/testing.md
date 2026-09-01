@@ -29,7 +29,7 @@ uses the developer's home directory.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.13` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.14` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -46,7 +46,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.13 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.14 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -66,6 +66,8 @@ to initialize Git. Then run:
 ```console
 konen doctor
 konen status
+konen status --state pending
+konen status --only tools,dotfiles --state missing,different
 konen plan --select
 konen tool add --dry-run node lts
 konen tool add --yes node lts
@@ -91,6 +93,8 @@ Expected results:
 - `status` reports the pending first Git commit and missing remote, shows the
   manual review/commit/private-remote commands and explicitly says it ran none
   of them;
+- filtered status shows only matching resources, combines category and state
+  filters and omits the unrelated Git backup section;
 - the initial selector displays its single `Dotfiles` option instead of an
   empty list;
 - the guided tool dry run displays the exact `mise.toml` diff without writing

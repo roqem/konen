@@ -620,6 +620,8 @@ func (a *App) printHelp() {
 		{"konen init [--git] [DIR]", "configura ou cria o estado"},
 		{"konen init --from ORIGEM [DIR]", "clona um estado; GitHub privado tem login assistido"},
 		{"konen status", "mostra tudo que o estado declara"},
+		{"konen status --only CATEGORIAS", "filtra packages, repos, dotfiles, tools, task ou user"},
+		{"konen status --state SITUAÇÕES", "filtra ready, pending, missing, different ou unknown"},
 		{"konen plan [--select]", "mostra o plano completo ou escolhe etapas"},
 		{"konen plan --only ETAPAS", "mostra somente etapas separadas por vírgula"},
 		{"konen apply [--select]", "aplica o estado completo ou escolhe etapas"},

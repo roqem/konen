@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,12 +21,28 @@ type statusRow struct {
 	item          string
 	configuration string
 	state         string
+	stateKey      string
 	part          string
 }
 
 func (a *App) runStatus(ctx context.Context, args []string) error {
-	if len(args) != 0 {
-		return errors.New("status não aceita argumentos")
+	flags := flag.NewFlagSet("status", flag.ContinueOnError)
+	flags.SetOutput(a.options.Err)
+	var only commaListFlag
+	var states commaListFlag
+	flags.Var(&only, "only", "limita a categorias separadas por vírgula")
+	flags.Var(&states, "state", "limita a situações separadas por vírgula")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return errors.New("status não aceita argumentos posicionais")
+	}
+	if err := validateStatusParts(only); err != nil {
+		return err
+	}
+	if err := validateStatusStates(states); err != nil {
+		return err
 	}
 	stateDir, misePath, err := a.loadTrustedMise(ctx)
 	if err != nil {
@@ -38,12 +55,16 @@ func (a *App) runStatus(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("mise: %w", err)
 	}
-	formatted, err := formatMiseStatusWithState([]byte(output), stateDir)
+	rows, err := parseMiseStatusRows([]byte(output), stateDir)
 	if err != nil {
 		return fmt.Errorf("status do mise inválido: %w", err)
 	}
-	fmt.Fprint(a.options.Out, formatted)
-	fmt.Fprint(a.options.Out, renderGitBackup(a.inspectGitBackup(ctx, stateDir), stateDir))
+	filtered := len(only) > 0 || len(states) > 0
+	rows = filterStatusRows(rows, only, states)
+	fmt.Fprint(a.options.Out, renderStatusRows(rows, filtered))
+	if !filtered {
+		fmt.Fprint(a.options.Out, renderGitBackup(a.inspectGitBackup(ctx, stateDir), stateDir))
+	}
 	return nil
 }
 
@@ -56,15 +77,22 @@ func formatMiseStatusWithState(data []byte, stateDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return renderStatusRows(rows, false), nil
+}
+
+func renderStatusRows(rows []statusRow, filtered bool) string {
 	if len(rows) == 0 {
-		return "Nenhum item declarado no estado.\n", nil
+		if filtered {
+			return "Nenhum item corresponde aos filtros.\n"
+		}
+		return "Nenhum item declarado no estado.\n"
 	}
 
 	tableRows := make([][]string, 0, len(rows))
 	for _, row := range rows {
 		tableRows = append(tableRows, []string{row.kind, row.item, row.configuration, row.state})
 	}
-	return ui.RenderTable([]string{"Tipo", "Item", "Configuração", "Estado"}, tableRows), nil
+	return ui.RenderTable([]string{"Tipo", "Item", "Configuração", "Estado"}, tableRows)
 }
 
 func parseMiseStatusRows(data []byte, stateDir string) ([]statusRow, error) {
@@ -106,15 +134,17 @@ func personalScriptRows(stateDir string) ([]statusRow, error) {
 		}
 		executable := info.Mode()&0o111 != 0
 		declaredState := "disponível"
+		stateKey := "available"
 		if !executable {
 			declaredState = "não executável"
+			stateKey = "not_executable"
 		}
 		switch {
 		case state.IsPersonalCommand(relative):
 			name := strings.TrimPrefix(relative, "scripts/bin/")
 			rows = append(rows, statusRow{
 				kind: "Comando pessoal", item: name,
-				configuration: "Fonte: " + relative, state: declaredState, part: "task",
+				configuration: "Fonte: " + relative, state: declaredState, stateKey: stateKey, part: "task",
 			})
 		default:
 			name, ok := state.TaskName(relative)
@@ -127,7 +157,7 @@ func personalScriptRows(stateDir string) ([]statusRow, error) {
 			}
 			rows = append(rows, statusRow{
 				kind: kind, item: name,
-				configuration: "Fonte: " + relative, state: declaredState, part: "task",
+				configuration: "Fonte: " + relative, state: declaredState, stateKey: stateKey, part: "task",
 			})
 		}
 	}
@@ -212,9 +242,11 @@ func statusRecord(path []string, record map[string]any, fallback string) statusR
 	}
 
 	state := "—"
+	stateKey := ""
 	for _, key := range []string{"state", "status"} {
 		if value, ok := record[key]; ok {
-			state = localizedState(statusValue(value))
+			stateKey = statusValue(value)
+			state = localizedState(stateKey)
 			break
 		}
 	}
@@ -241,7 +273,7 @@ func statusRecord(path []string, record map[string]any, fallback string) statusR
 	}
 	return statusRow{
 		kind: statusKind(path), item: item, configuration: configuration, state: state,
-		part: statusApplyPart(path),
+		stateKey: stateKey, part: statusApplyPart(path),
 	}
 }
 

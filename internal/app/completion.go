@@ -126,7 +126,13 @@ _konen() {
 		'--from=[clona um estado; github:OWNER/REPO ativa login assistido]:origem do repositório:_urls' \
         '1:pasta do estado:_directories'
       ;;
-    status|diff|projects|trust|doctor|version|help)
+    status)
+      _arguments \
+        '(-h --help)'{-h,--help}'[mostra ajuda]' \
+        '--only=[limita a categorias separadas por vírgula]:categorias:(packages repos dotfiles tools task user)' \
+        '--state=[limita a situações separadas por vírgula]:situações:(ready pending missing different unknown)'
+      ;;
+    diff|projects|trust|doctor|version|help)
       _arguments
       ;;
     plan)
@@ -316,6 +322,15 @@ const bashCompletion = `_konen_completion() {
         COMPREPLY=( $(compgen -d -- "$current") )
       fi
       ;;
+    status)
+      if [[ $previous == --only ]]; then
+        COMPREPLY=( $(compgen -W 'packages repos dotfiles tools task user' -- "$current") )
+      elif [[ $previous == --state ]]; then
+        COMPREPLY=( $(compgen -W 'ready pending missing different unknown' -- "$current") )
+      else
+        COMPREPLY=( $(compgen -W '--only --state -h --help' -- "$current") )
+      fi
+      ;;
     plan)
       COMPREPLY=( $(compgen -W '--select --only -h --help' -- "$current") )
       ;;
@@ -430,6 +445,8 @@ complete -c konen -n '__fish_use_subcommand' -a help -d 'Mostra ajuda'
 complete -c konen -n '__fish_use_subcommand' -a '(konen __complete projects 2>/dev/null)' -d 'Abre o projeto'
 complete -c konen -n '__fish_seen_subcommand_from init' -l git -d 'Inicializa um repositório Git'
 complete -c konen -n '__fish_seen_subcommand_from init' -l from -r -d 'Clona um estado; GitHub privado tem login assistido'
+complete -c konen -n '__fish_seen_subcommand_from status' -l only -r -a 'packages repos dotfiles tools task user' -d 'Limita a categorias'
+complete -c konen -n '__fish_seen_subcommand_from status' -l state -r -a 'ready pending missing different unknown' -d 'Limita a situações'
 complete -c konen -n '__fish_seen_subcommand_from apply' -l yes -d 'Não pede confirmação'
 complete -c konen -n '__fish_seen_subcommand_from apply' -l dry-run -d 'Mostra o plano sem alterar a máquina'
 complete -c konen -n '__fish_seen_subcommand_from plan apply' -l select -d 'Escolhe as etapas interativamente'

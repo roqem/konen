@@ -225,6 +225,15 @@ esac
 	} {
 		assertContains(t, output, fragment)
 	}
+	output = runCommand(t, root, environment, konen, "status", "--only", "tools", "--state", "missing")
+	for _, fragment := range []string{"Ferramenta", "go", "ausente"} {
+		assertContains(t, output, fragment)
+	}
+	if strings.Contains(output, "Backup Git") {
+		t.Fatalf("filtered status included backup guidance:\n%s", output)
+	}
+	output = runCommand(t, root, environment, konen, "status", "--only", "dotfiles", "--state", "pending")
+	assertContains(t, output, "Nenhum item corresponde aos filtros.")
 	if _, err := runCommandError(stateDir, environment, "git", "rev-parse", "--verify", "HEAD"); err == nil {
 		t.Fatal("status created the first Git commit")
 	}
@@ -293,6 +302,8 @@ esac
 	assertContains(t, completion, "__complete projects")
 	assertContains(t, completion, "dotfile")
 	assertContains(t, completion, "installer")
+	assertContains(t, completion, "--state")
+	assertContains(t, completion, "ready pending missing different unknown")
 
 	manifestPath := filepath.Join(stateDir, "projects", "sample.toml")
 	manifest := `version = 1

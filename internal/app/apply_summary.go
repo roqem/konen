@@ -66,7 +66,7 @@ func buildApplySummary(before, after []statusRow, only []string, taskRan bool) a
 	}
 
 	for _, row := range after {
-		if !isConvergedState(row.state) {
+		if statusRowStateGroup(row) != "ready" {
 			summary.pendingAll = append(summary.pendingAll, row)
 		}
 		if !rowInApplyScope(row, only) {
@@ -75,11 +75,11 @@ func buildApplySummary(before, after []statusRow, only []string, taskRan bool) a
 		key := statusRowKey(row)
 		previous, found := takeStatusRow(beforeByKey, key)
 		switch {
-		case !isConvergedState(row.state):
+		case statusRowStateGroup(row) != "ready":
 			summary.pendingScope = append(summary.pendingScope, row)
-		case !found || !isConvergedState(previous.state) || previous.state != row.state || previous.configuration != row.configuration:
+		case !found || statusRowStateGroup(previous) != "ready" || previous.state != row.state || previous.configuration != row.configuration:
 			summary.changed = append(summary.changed, row)
-			if found && !isConvergedState(previous.state) && (row.part == "user" || row.kind == "Shell de login") {
+			if found && statusRowStateGroup(previous) != "ready" && (row.part == "user" || row.kind == "Shell de login") {
 				summary.loginChanged = true
 			}
 		default:
@@ -89,7 +89,7 @@ func buildApplySummary(before, after []statusRow, only []string, taskRan bool) a
 
 	for _, remaining := range beforeByKey {
 		for _, row := range remaining {
-			if isConvergedState(row.state) {
+			if statusRowStateGroup(row) == "ready" {
 				summary.ready = append(summary.ready, row)
 				continue
 			}

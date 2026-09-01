@@ -59,7 +59,7 @@ Objetivo: tornar manutenção e atualização tão claras quanto o primeiro uso.
 - [x] resumir ao final do `apply` o que mudou e quais ações manuais restaram;
 - [x] distinguir melhor recursos convergidos de tarefas idempotentes sempre
   selecionadas;
-- [ ] oferecer filtros de status para itens ausentes, diferentes ou por categoria;
+- [x] oferecer filtros de status para itens ausentes, diferentes ou por categoria;
 - [ ] projetar atualização explícita do Konen e do mise, com versão e plano
   visíveis;
 - [ ] definir migrações compatíveis para qualquer mudança futura do estado;

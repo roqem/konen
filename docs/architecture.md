@@ -37,6 +37,10 @@ repository. Kitty remains the execution and layout engine.
   invoke mise again and requires a new review.
 - `status` exposes the complete declared state and `plan` exposes pending
   mutations before `apply`; Konen must not maintain a hidden install list.
+  Status filters operate on canonical state keys from mise's JSON rather than
+  translated display text. Unknown future states remain explicitly filterable
+  instead of being guessed as ready or pending. Filtered resource views omit
+  the unrelated Git backup guidance.
 - All Konen lists use one lightweight table renderer. `status` consumes mise's
   stable JSON output and renders unknown resource kinds generically, so newer
   fields remain visible instead of disappearing behind a stale typed parser.

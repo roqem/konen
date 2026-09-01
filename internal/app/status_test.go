@@ -45,6 +45,114 @@ func TestStatusRequestsJSONFromMise(t *testing.T) {
 	}
 }
 
+func TestStatusFiltersCategoriesAndCanonicalStates(t *testing.T) {
+	root := t.TempDir()
+	stateDir := filepath.Join(root, "state")
+	runner := &fakeRunner{
+		paths: map[string]string{"mise": "/bin/mise"},
+		outputs: map[string]string{
+			"/bin/mise": `{
+  "packages": {"apt": {"packages": [
+    {"package":"git", "state":"installed"}
+  ]}},
+  "dotfiles": {"files": [
+    {"target":"~/.zshrc", "state":"differs"}
+  ]},
+  "tools": [
+    {"tool":"node", "state":"missing"},
+    {"tool":"go", "state":"installed"}
+  ]
+}`,
+		},
+	}
+	var out bytes.Buffer
+	application := New(Options{
+		ConfigPath: filepath.Join(root, "config.toml"),
+		HomeDir:    root, Out: &out, Err: &out, Runner: runner, Prompter: unusedPrompter{},
+	})
+	if err := application.Run(context.Background(), []string{"init", stateDir}); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+
+	if err := application.Run(context.Background(), []string{
+		"status", "--only", "tools,dotfiles", "--state", "missing,different",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	for _, fragment := range []string{"Ferramenta", "node", "ausente", "Dotfile", "~/.zshrc", "diferente"} {
+		if !strings.Contains(got, fragment) {
+			t.Errorf("filtered status is missing %q:\n%s", fragment, got)
+		}
+	}
+	for _, unwanted := range []string{"go", "git", "Backup Git"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("filtered status contains %q:\n%s", unwanted, got)
+		}
+	}
+}
+
+func TestStatusStateGroupsCoverPersonalAndUnknownRows(t *testing.T) {
+	rows := []statusRow{
+		{item: "tool", state: "traduzido arbitrariamente", stateKey: "installed", part: "tools"},
+		{item: "command", state: "disponível", stateKey: "available", part: "task"},
+		{item: "source", state: "fonte ausente", stateKey: "source_missing", part: "dotfiles"},
+		{item: "different", state: "diferente", stateKey: "differs", part: "dotfiles"},
+		{item: "future", state: "future_state", stateKey: "future_state", part: "future"},
+	}
+
+	tests := []struct {
+		state string
+		want  []string
+	}{
+		{state: "ready", want: []string{"tool", "command"}},
+		{state: "pending", want: []string{"source", "different"}},
+		{state: "missing", want: []string{"source"}},
+		{state: "different", want: []string{"different"}},
+		{state: "unknown", want: []string{"future"}},
+	}
+	for _, test := range tests {
+		t.Run(test.state, func(t *testing.T) {
+			filtered := filterStatusRows(rows, nil, []string{test.state})
+			var got []string
+			for _, row := range filtered {
+				got = append(got, row.item)
+			}
+			if !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("filter %s = %#v, want %#v", test.state, got, test.want)
+			}
+		})
+	}
+}
+
+func TestStatusRejectsUnknownFiltersBeforeInvokingMise(t *testing.T) {
+	for _, test := range []struct {
+		args     []string
+		fragment string
+	}{
+		{args: []string{"status", "--only", "browsers"}, fragment: "categoria desconhecida"},
+		{args: []string{"status", "--state", "broken"}, fragment: "situação desconhecida"},
+	} {
+		runner := &fakeRunner{}
+		application := New(Options{Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, Runner: runner})
+		err := application.Run(context.Background(), test.args)
+		if err == nil || !strings.Contains(err.Error(), test.fragment) {
+			t.Fatalf("status %v error = %v", test.args, err)
+		}
+		if len(runner.runs) != 0 {
+			t.Fatalf("invalid filter invoked commands: %#v", runner.runs)
+		}
+	}
+}
+
+func TestFilteredStatusExplainsAnEmptyResult(t *testing.T) {
+	got := renderStatusRows(nil, true)
+	if got != "Nenhum item corresponde aos filtros.\n" {
+		t.Fatalf("empty filtered status = %q", got)
+	}
+}
+
 func TestFormatMiseStatusUsesUnifiedTableAndKeepsUnknownKinds(t *testing.T) {
 	input := []byte(`{
   "packages": {"apt": {"curl": "latest"}},
