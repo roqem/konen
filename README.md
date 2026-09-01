@@ -37,7 +37,7 @@ selecionadas automaticamente:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.20 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.21 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
