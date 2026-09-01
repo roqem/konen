@@ -12,14 +12,14 @@ import (
 
 func TestCompletionScriptsCoverCommandsAndDynamicProjects(t *testing.T) {
 	common := []string{
-		"init", "status", "plan", "diff", "apply", "tool", "package", "repo", "command", "installer", "dotfile", "add", "projects", "project", "dev",
+		"init", "status", "plan", "diff", "apply", "update", "tool", "package", "repo", "command", "installer", "dotfile", "add", "projects", "project", "dev",
 		"trust", "doctor", "completion", "version", "help",
 		"edit", "list", "show", "__complete projects",
 	}
 	options := map[string][]string{
-		"zsh":  {"--git", "--from", "--yes", "--dry-run", "--select", "--only", "--state", "ready", "pending", "unknown", "--manager", "--mode"},
-		"bash": {"--git", "--from", "--yes", "--dry-run", "--select", "--only", "--state", "ready", "pending", "unknown", "--manager", "--mode"},
-		"fish": {"-l git", "-l from", "-l yes", "-l dry-run", "-l select", "-l only", "-l state", "ready", "pending", "unknown", "-l manager", "-l mode"},
+		"zsh":  {"--git", "--from", "--yes", "--dry-run", "--select", "--only", "--state", "ready", "pending", "unknown", "--pre", "konen mise", "--manager", "--mode"},
+		"bash": {"--git", "--from", "--yes", "--dry-run", "--select", "--only", "--state", "ready", "pending", "unknown", "--pre", "konen mise", "--manager", "--mode"},
+		"fish": {"-l git", "-l from", "-l yes", "-l dry-run", "-l select", "-l only", "-l state", "ready", "pending", "unknown", "-l pre", "konen mise", "-l manager", "-l mode"},
 	}
 	for _, shell := range []string{"zsh", "bash", "fish"} {
 		script, err := completionScript(shell)

@@ -28,17 +28,19 @@ func main() {
 	}
 
 	runner := execx.OSRunner{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}
+	executable := executablePath()
 	application := app.New(app.Options{
-		ConfigPath:  configPath,
-		HomeDir:     homeDir,
-		In:          os.Stdin,
-		Out:         os.Stdout,
-		Err:         os.Stderr,
-		Runner:      runner,
-		Prompter:    ui.NewHuhPrompter(os.Stdin, os.Stderr),
-		Interactive: isTerminal(os.Stdin),
-		Version:     version,
-		BinDir:      executableDir(),
+		ConfigPath:     configPath,
+		HomeDir:        homeDir,
+		In:             os.Stdin,
+		Out:            os.Stdout,
+		Err:            os.Stderr,
+		Runner:         runner,
+		Prompter:       ui.NewHuhPrompter(os.Stdin, os.Stderr),
+		Interactive:    isTerminal(os.Stdin),
+		Version:        version,
+		BinDir:         executableDir(executable),
+		ExecutablePath: executable,
 	})
 
 	if err := application.Run(context.Background(), os.Args[1:]); err != nil {
@@ -47,9 +49,16 @@ func main() {
 	}
 }
 
-func executableDir() string {
+func executablePath() string {
 	executable, err := os.Executable()
 	if err != nil {
+		return ""
+	}
+	return executable
+}
+
+func executableDir(executable string) string {
+	if executable == "" {
 		return ""
 	}
 	return filepath.Dir(executable)

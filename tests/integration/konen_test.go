@@ -54,7 +54,9 @@ func TestInstallerInstallsUpdatesAndRejectsCorruption(t *testing.T) {
 		"SHELL":                       "/bin/sh",
 		"TMPDIR":                      tempDir,
 		"KONEN_RELEASE_BASE_URL":      server.URL + "/konen",
+		"KONEN_RELEASE_API_URL":       server.URL + "/konen-api",
 		"KONEN_MISE_RELEASE_BASE_URL": server.URL + "/mise",
+		"KONEN_MISE_RELEASE_API_URL":  server.URL + "/mise-api",
 		"KONEN_MISE_VERSION":          testMiseVersion,
 		"KONEN_INSTALL_DIR":           "",
 		"KONEN_INSTALL_MISE":          "1",
@@ -125,6 +127,25 @@ func TestInstallerInstallsUpdatesAndRejectsCorruption(t *testing.T) {
 	}
 	if data, err := os.ReadFile(stateMarker); err != nil || string(data) != "preserved\n" {
 		t.Fatalf("failed update changed state: data=%q error=%v", data, err)
+	}
+
+	thirdVersion := "0.1.0-test.3"
+	createKonenRelease(t, releases, thirdVersion, architecture)
+	latest.Set(thirdVersion)
+	output = runCommand(t, root, environment, installedKonen, "update", "--dry-run", "--only", "konen")
+	for _, fragment := range []string{secondVersion, thirdVersion, "baixar, verificar checksum", "Nenhuma atualização foi executada"} {
+		assertContains(t, output, fragment)
+	}
+	if got := strings.TrimSpace(runCommand(t, root, environment, installedKonen, "version")); got != secondVersion {
+		t.Fatalf("self-update dry run changed version = %q, want %q", got, secondVersion)
+	}
+	output = runCommand(t, root, environment, installedKonen, "update", "--yes", "--only", "konen")
+	assertContains(t, output, "Konen atualizado: "+thirdVersion)
+	if got := strings.TrimSpace(runCommand(t, root, environment, installedKonen, "version")); got != thirdVersion {
+		t.Fatalf("self-updated version = %q, want %q", got, thirdVersion)
+	}
+	if data, err := os.ReadFile(stateMarker); err != nil || string(data) != "preserved\n" {
+		t.Fatalf("self-update changed state: data=%q error=%v", data, err)
 	}
 }
 
@@ -376,6 +397,14 @@ func (r *latestRelease) Get() string {
 func newReleaseServer(t *testing.T, root string, latest *latestRelease) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/konen-api" {
+			fmt.Fprintf(response, `[{"tag_name":"v%s","prerelease":true}]`, latest.Get())
+			return
+		}
+		if request.URL.Path == "/mise-api/latest" {
+			fmt.Fprintf(response, `{"tag_name":"v%s"}`, testMiseVersion)
+			return
+		}
 		if request.URL.Path == "/konen/latest" {
 			http.Redirect(response, request, "/konen/tag/v"+latest.Get(), http.StatusFound)
 			return

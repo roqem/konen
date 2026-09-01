@@ -113,6 +113,7 @@ func (p HuhPrompter) Menu(configured bool) (string, error) {
 		huh.NewOption(CommandLabel("apply", "aplicar etapas escolhidas", 13), "__apply_select"),
 		huh.NewOption(CommandLabel("dev", "abrir um projeto", 13), "dev"),
 		huh.NewOption(CommandLabel("status", "ver tudo configurado", 13), "status"),
+		huh.NewOption(CommandLabel("update", "revisar atualizações", 13), "update"),
 		huh.NewOption(CommandLabel("tool add", "adicionar uma ferramenta", 13), "__tool_add"),
 		huh.NewOption(CommandLabel("package add", "adicionar um pacote do sistema", 13), "__package_add"),
 		huh.NewOption(CommandLabel("repo add", "adicionar um repositório Git", 13), "__repo_add"),
@@ -126,6 +127,7 @@ func (p HuhPrompter) Menu(configured bool) (string, error) {
 	if !configured {
 		options = []huh.Option[string]{
 			huh.NewOption(CommandLabel("init", "configurar o Konen", 8), "init"),
+			huh.NewOption(CommandLabel("update", "revisar atualizações", 8), "update"),
 			huh.NewOption(CommandLabel("doctor", "diagnosticar problemas", 8), "doctor"),
 			huh.NewOption(CommandLabel("q", "sair", 8), "__exit"),
 		}
@@ -395,7 +397,7 @@ func (p HuhPrompter) Confirm(title string) (bool, error) {
 	form := huh.NewForm(huh.NewGroup(
 		huh.NewConfirm().
 			Title(title).
-			Affirmative("Gravar").
+			Affirmative("Confirmar").
 			Negative("Cancelar").
 			Value(&confirmed),
 	)).WithInput(p.in).WithOutput(p.out).WithKeyMap(cancelKeyMap())

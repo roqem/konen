@@ -68,6 +68,7 @@ _konen() {
     'plan:mostra exatamente o que mudaria'
     'diff:mostra diferenças dos dotfiles'
     'apply:aplica o estado com mise'
+    'update:mostra versões e atualiza Konen e mise'
     'tool:gerencia ferramentas do estado'
     'package:gerencia pacotes do sistema no estado'
     'repo:gerencia repositórios Git no estado'
@@ -148,6 +149,14 @@ _konen() {
         '--dry-run[mostra o plano sem alterar a máquina]' \
         '--select[escolhe as etapas interativamente]' \
         '--only=[limita a etapas separadas por vírgula]:etapas:(packages repos dotfiles tools task)'
+      ;;
+    update)
+      _arguments \
+        '(-h --help)'{-h,--help}'[mostra ajuda]' \
+        '--dry-run[mostra versões e ações sem atualizar]' \
+        '--yes[atualiza sem pedir confirmação]' \
+        '--pre[inclui prereleases do Konen]' \
+        '--only=[limita aos componentes separados por vírgula]:componentes:(konen mise)'
       ;;
     tool)
       if (( CURRENT == 2 )); then
@@ -310,7 +319,7 @@ const bashCompletion = `_konen_completion() {
   command="${COMP_WORDS[1]}"
 
   if [[ $COMP_CWORD -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W "init status plan diff apply tool package repo command installer dotfile projects project dev trust doctor completion version help $(konen __complete projects 2>/dev/null)" -- "$current") )
+    COMPREPLY=( $(compgen -W "init status plan diff apply update tool package repo command installer dotfile projects project dev trust doctor completion version help $(konen __complete projects 2>/dev/null)" -- "$current") )
     return
   fi
 
@@ -336,6 +345,13 @@ const bashCompletion = `_konen_completion() {
       ;;
     apply)
       COMPREPLY=( $(compgen -W '--yes --dry-run --select --only -h --help' -- "$current") )
+      ;;
+    update)
+      if [[ $previous == --only ]]; then
+        COMPREPLY=( $(compgen -W 'konen mise' -- "$current") )
+      else
+        COMPREPLY=( $(compgen -W '--dry-run --yes --pre --only -h --help' -- "$current") )
+      fi
       ;;
     tool)
       action="${COMP_WORDS[2]}"
@@ -428,6 +444,7 @@ complete -c konen -n '__fish_use_subcommand' -a status -d 'Mostra tudo que o est
 complete -c konen -n '__fish_use_subcommand' -a plan -d 'Mostra exatamente o que mudaria'
 complete -c konen -n '__fish_use_subcommand' -a diff -d 'Mostra diferenças dos dotfiles'
 complete -c konen -n '__fish_use_subcommand' -a apply -d 'Aplica o estado com mise'
+complete -c konen -n '__fish_use_subcommand' -a update -d 'Mostra versões e atualiza Konen e mise'
 complete -c konen -n '__fish_use_subcommand' -a tool -d 'Gerencia ferramentas do estado'
 complete -c konen -n '__fish_use_subcommand' -a package -d 'Gerencia pacotes do sistema no estado'
 complete -c konen -n '__fish_use_subcommand' -a repo -d 'Gerencia repositórios Git no estado'
@@ -449,6 +466,10 @@ complete -c konen -n '__fish_seen_subcommand_from status' -l only -r -a 'package
 complete -c konen -n '__fish_seen_subcommand_from status' -l state -r -a 'ready pending missing different unknown' -d 'Limita a situações'
 complete -c konen -n '__fish_seen_subcommand_from apply' -l yes -d 'Não pede confirmação'
 complete -c konen -n '__fish_seen_subcommand_from apply' -l dry-run -d 'Mostra o plano sem alterar a máquina'
+complete -c konen -n '__fish_seen_subcommand_from update' -l dry-run -d 'Mostra versões e ações sem atualizar'
+complete -c konen -n '__fish_seen_subcommand_from update' -l yes -d 'Atualiza sem pedir confirmação'
+complete -c konen -n '__fish_seen_subcommand_from update' -l pre -d 'Inclui prereleases do Konen'
+complete -c konen -n '__fish_seen_subcommand_from update' -l only -r -a 'konen mise' -d 'Limita aos componentes'
 complete -c konen -n '__fish_seen_subcommand_from plan apply' -l select -d 'Escolhe as etapas interativamente'
 complete -c konen -n '__fish_seen_subcommand_from plan apply' -l only -r -a 'packages repos dotfiles tools task' -d 'Limita a etapas'
 complete -c konen -n '__fish_seen_subcommand_from tool' -a add -d 'Adiciona uma ferramenta ao estado'

@@ -35,6 +35,14 @@ repository. Kitty remains the execution and layout engine.
   as completed without error because idempotent tasks do not expose convergent
   state. If executable-surface approval changes during the run, Konen does not
   invoke mise again and requires a new review.
+- Product updates are independent from machine-state convergence. `update`
+  resolves published versions before mutation, renders the complete plan and
+  requires confirmation. A Konen candidate is downloaded, checksum-verified,
+  staged beside the current executable and version-checked before replacement;
+  the co-installed mise uses its native `self-update` with an exact target and
+  without plugin updates. Konen prepares its candidate before mutating mise and
+  replaces itself last. Executables outside the user's home and mise binaries
+  not co-installed with Konen remain owned by their package manager.
 - `status` exposes the complete declared state and `plan` exposes pending
   mutations before `apply`; Konen must not maintain a hidden install list.
   Status filters operate on canonical state keys from mise's JSON rather than

@@ -60,7 +60,7 @@ Objetivo: tornar manutenção e atualização tão claras quanto o primeiro uso.
 - [x] distinguir melhor recursos convergidos de tarefas idempotentes sempre
   selecionadas;
 - [x] oferecer filtros de status para itens ausentes, diferentes ou por categoria;
-- [ ] projetar atualização explícita do Konen e do mise, com versão e plano
+- [x] projetar atualização explícita do Konen e do mise, com versão e plano
   visíveis;
 - [ ] definir migrações compatíveis para qualquer mudança futura do estado;
 - [ ] modelar ações nomeadas de projeto, como preparar, testar, abrir console ou

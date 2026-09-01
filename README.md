@@ -35,7 +35,7 @@ selecionadas automaticamente:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.14 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.15 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -613,6 +613,8 @@ aprovação local separada; uma edição ou pull exige
 | `konen apply --select` | Escolhe por checkboxes quais etapas serão aplicadas. |
 | `konen apply --only tools,dotfiles` | Aplica somente as etapas informadas. |
 | `konen apply --yes` | Aplica sem perguntas; use somente depois de revisar o plano. |
+| `konen update --dry-run` | Mostra versões e mecanismos sem atualizar. |
+| `konen update [--yes]` | Atualiza componentes próprios após revisão. |
 | `konen trust` | Aprova localmente o estado executável que você revisou. |
 | `konen tool add [NOME] [VERSÃO]` | Adiciona uma ferramenta ao estado mostrando o diff. |
 | `konen package add [--manager M] PACOTE [VERSÃO]` | Adiciona um pacote do sistema sem instalá-lo. |
@@ -654,6 +656,40 @@ konen completion fish > ~/.config/fish/completions/konen.fish
 ```
 
 O autocomplete inclui comandos, opções, caminhos e nomes de projetos.
+
+## Atualizando o Konen e o mise
+
+Atualização é uma operação separada do estado da máquina. Primeiro consulte o
+plano sem trocar nenhum executável:
+
+```console
+konen update --dry-run
+konen update --dry-run --only konen
+konen update --dry-run --only mise
+```
+
+A tabela mostra a versão atual, a release publicada escolhida e o mecanismo que
+será usado. Builds prerelease, como as alphas, acompanham a prerelease mais
+recente. Builds estáveis ignoram prereleases; `--pre` permite incluí-las
+explicitamente.
+
+Quando o plano estiver correto:
+
+```console
+konen update
+# ou, em automações:
+konen update --yes
+```
+
+O Konen baixa seu archive, verifica o checksum publicado e valida a versão do
+executável preparado antes da substituição atômica. O mise coinstalado ao lado
+dele é atualizado pelo próprio `mise self-update`, sem atualizar plugins.
+Downloads e validações do Konen terminam antes da atualização do mise.
+
+O auto-update só substitui um Konen instalado dentro da pasta pessoal e um mise
+coinstalado no mesmo diretório. Se APT, Homebrew ou outro gerenciador for o
+responsável, o plano mostra o caminho e pede que a atualização seja feita por
+ele. O repositório de estado, seus dotfiles e projetos não são alterados.
 
 ## Segurança em poucas regras
 

@@ -37,6 +37,23 @@ Supported overrides:
 The release-base URL overrides exist for mirrors and integration tests:
 `KONEN_RELEASE_BASE_URL` and `KONEN_MISE_RELEASE_BASE_URL`.
 
+## In-product updates
+
+`konen update` uses the same release archives and checksum contract as the
+installer. Its read-only plan resolves release metadata through the GitHub API,
+shows current and target versions and identifies which manager owns each
+executable. Prerelease builds follow the newest published prerelease; stable
+builds require `--pre` to enter that channel.
+
+After confirmation, Konen downloads and validates its own candidate before any
+component changes, asks the co-installed mise to update itself to the exact
+planned version with plugin updates disabled, and atomically replaces Konen
+last. It never mutates state repositories. Package-managed executables outside
+the supported user-local installation remain manual actions in the plan.
+
+Metadata mirrors used by integration tests can override
+`KONEN_RELEASE_API_URL` and `KONEN_MISE_RELEASE_API_URL`.
+
 ## Trust model
 
 Checksums protect against corruption and inconsistent assets, but a checksum

@@ -20,18 +20,20 @@ import (
 )
 
 type Options struct {
-	ConfigPath  string
-	HomeDir     string
-	In          io.Reader
-	Out         io.Writer
-	Err         io.Writer
-	Runner      execx.Runner
-	Prompter    ui.Prompter
-	Interactive bool
-	Version     string
-	BinDir      string
-	WorkDir     string
-	Getenv      func(string) string
+	ConfigPath     string
+	HomeDir        string
+	In             io.Reader
+	Out            io.Writer
+	Err            io.Writer
+	Runner         execx.Runner
+	Prompter       ui.Prompter
+	Interactive    bool
+	Version        string
+	BinDir         string
+	WorkDir        string
+	Getenv         func(string) string
+	HTTPClient     httpDoer
+	ExecutablePath string
 }
 
 type App struct {
@@ -47,6 +49,9 @@ func New(options Options) *App {
 	}
 	if options.WorkDir == "" {
 		options.WorkDir, _ = os.Getwd()
+	}
+	if options.HTTPClient == nil {
+		options.HTTPClient = defaultHTTPClient()
 	}
 	return &App{options: options, state: state.Service{Runner: options.Runner}}
 }
@@ -103,6 +108,8 @@ func (a *App) run(ctx context.Context, args []string) error {
 		return a.runTrust(ctx, args[1:])
 	case "doctor":
 		return a.runDoctor(ctx)
+	case "update":
+		return a.runUpdate(ctx, args[1:])
 	case "dev":
 		return a.runDev(ctx, args[1:])
 	case "project":
@@ -628,6 +635,7 @@ func (a *App) printHelp() {
 		{"konen apply --only ETAPAS", "aplica somente etapas separadas por vírgula"},
 		{"konen trust", "confia no mise.toml após revisão"},
 		{"konen doctor", "diagnostica a instalação"},
+		{"konen update [--dry-run]", "mostra versões e atualiza Konen e mise após confirmação"},
 	})
 	a.printCommandGroup("Estado", [][2]string{
 		{"konen tool add [NOME] [VERSÃO]", "adiciona uma ferramenta pelo assistente"},
