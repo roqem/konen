@@ -31,7 +31,7 @@ uses the developer's home directory.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.15` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.16` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -48,7 +48,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.15 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.16 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -122,20 +122,21 @@ Expected results:
 - the state is an ordinary Git repository, Konen explains that it did not
   commit anything, and its initial files are visible as untracked.
 
-To qualify the updater itself, install the immediately previous prerelease in a
-disposable VM, then let it discover this candidate:
+To qualify the updater itself, install a published prerelease that already
+contains `konen update` in a disposable VM, then let it discover this candidate.
+Alpha.15 is the first such release:
 
 ```console
-KONEN_VERSION=v0.1.0-alpha.14 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.15 sh install.sh
 konen update --dry-run --only konen
 konen version
 konen update --yes --only konen
 konen version
 ```
 
-The dry run must show alpha.14 as current and alpha.15 as available without
+The dry run must show alpha.15 as current and alpha.16 as available without
 changing the first `konen version`. The confirmed command must verify, stage and
-install alpha.15. The configured state path and its Git status must remain
+install alpha.16. The configured state path and its Git status must remain
 unchanged.
 
 After the real apply, exercise installer authoring without adding an incomplete

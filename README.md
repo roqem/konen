@@ -35,7 +35,7 @@ selecionadas automaticamente:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.15 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.16 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -661,6 +661,10 @@ O autocomplete inclui comandos, opções, caminhos e nomes de projetos.
 
 Atualização é uma operação separada do estado da máquina. Primeiro consulte o
 plano sem trocar nenhum executável:
+
+> `konen update` existe desde a alpha.15. Versões anteriores precisam usar o
+> `install.sh` mais uma vez; depois disso, as próximas atualizações podem ser
+> feitas pelo próprio Konen.
 
 ```console
 konen update --dry-run
