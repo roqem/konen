@@ -21,6 +21,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - run: sh -n install.sh
+      - run: bash -n scripts/*.sh
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test ./...
@@ -45,3 +47,14 @@ jobs:
             --title "Konen $GITHUB_REF_NAME" \
             --verify-tag \
             "${release_flags[@]}"
+
+  smoke:
+    name: Smoke published release
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install and reapply in a disposable home
+        run: scripts/smoke-release.sh "$GITHUB_REF_NAME"

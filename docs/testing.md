@@ -32,10 +32,16 @@ Linux integration journeys:
 The integration harness never applies the developer's machine state and never
 uses the developer's home directory.
 
+Every tagged release adds a second, public smoke boundary after the archives
+are published. `scripts/smoke-release.sh vX.Y.Z` downloads the actual release
+and pinned mise into a disposable home, runs `init`, `doctor`, `status`, plan,
+apply and immediate reapply, then proves that sudo, commits and remotes were not
+created. The release workflow fails when this post-publication journey fails.
+
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.19` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.20` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -52,7 +58,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.19 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.20 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -130,16 +136,16 @@ To qualify the updater itself, install the immediately preceding prerelease in
 a disposable VM, then let it discover this candidate:
 
 ```console
-KONEN_VERSION=v0.1.0-alpha.18 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.19 sh install.sh
 konen update --dry-run --only konen
 konen version
 konen update --yes --only konen
 konen version
 ```
 
-The dry run must show alpha.18 as current and alpha.19 as available without
+The dry run must show alpha.19 as current and alpha.20 as available without
 changing the first `konen version`. The confirmed command must verify, stage and
-install alpha.19. The configured state path and its Git status must remain
+install alpha.20. The configured state path and its Git status must remain
 unchanged.
 
 Qualify format migration with an isolated configuration and state, never the

@@ -76,7 +76,7 @@ depender de aliases obscuros.
 
 Objetivo: estabilizar o contrato antes de ampliar distribuição e integrações.
 
-- automatizar um smoke test público em ambiente Linux descartável;
+- [x] automatizar um smoke test público em ambiente Linux descartável;
 - manter a qualificação manual com um estado privado representativo;
 - testar instalação, atualização, interrupção de rede e reaplicação;
 - revisar mensagens e documentação com linguagem direta e natural;

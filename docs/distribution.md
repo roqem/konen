@@ -4,11 +4,23 @@
 
 A tag named `vX.Y.Z` triggers the release workflow. The workflow runs formatting,
 static analysis and tests, then publishes deterministic archives for Linux
-`amd64` and `arm64` plus `checksums.txt`.
+`amd64` and `arm64` plus `checksums.txt`. Only after publication, a second job
+uses `scripts/smoke-release.sh` to download that public archive through
+`install.sh`, install Konen and mise into a disposable home, initialize state,
+apply and reapply its dotfile phase and verify that neither sudo, Git commits
+nor remotes appeared.
 
 Archives are built by `scripts/build-release.sh`, not by an opaque release
 service. They contain only the Konen executable, README and Apache-2.0 license.
 GitHub's build-provenance action also attests the archives.
+
+The smoke test deliberately validates the published download rather than a
+binary left in the workflow workspace. It can also qualify an existing release
+locally without touching the developer's home:
+
+```console
+scripts/smoke-release.sh vX.Y.Z
+```
 
 ## Installer
 

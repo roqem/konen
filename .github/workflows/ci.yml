@@ -16,6 +16,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - run: sh -n install.sh
+      - run: bash -n scripts/*.sh
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test ./...
