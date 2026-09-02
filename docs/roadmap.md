@@ -86,5 +86,10 @@ Objetivo: estabilizar o contrato antes de ampliar distribuição e integrações
   atualizado sem reconstrução manual.
 
 Depois da beta, entram em avaliação pacote `.deb`, repositório APT assinado,
-outros terminais e perfis de máquina. Eles não devem atrasar a estabilização do
-fluxo central.
+outros terminais e perfis de máquina. O onboarding poderá apresentar checkboxes
+para perfis declarados pelo próprio estado — por exemplo base, terminal, editor,
+trabalho ou desenvolvimento de jogos — e mostrar o plano resultante antes de
+aplicar. Editores e terminais alternativos devem ser opções explícitas, sem o
+Konen presumir que todos querem Neovim, Kitty, VS Code ou Terminator e sem criar
+um catálogo hard-coded no núcleo. Esses itens não devem atrasar a estabilização
+do fluxo central.
