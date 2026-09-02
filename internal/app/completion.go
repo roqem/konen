@@ -335,7 +335,9 @@ _konen() {
       ;;
     run)
       if (( CURRENT == 2 )); then
-        _alternative 'actions:ação:_konen_actions' 'projects:projeto:_konen_projects'
+		_alternative 'options:opção:(--dry-run -h --help)' 'actions:ação:_konen_actions' 'projects:projeto:_konen_projects'
+		elif [[ $words[CURRENT] == -* ]]; then
+			_values 'opção' '--dry-run[mostra a ação sem executar]' '-h[mostra ajuda]' '--help[mostra ajuda]'
       else
         _konen_actions "$words[2]"
       fi
@@ -356,7 +358,9 @@ _konen() {
         edit|show|trust) _arguments '1:projeto:_konen_projects' ;;
         run)
           if (( CURRENT == 2 )); then
-            _konen_projects
+				_alternative 'options:opção:(--dry-run -h --help)' 'projects:projeto:_konen_projects'
+			elif [[ $words[CURRENT] == -* ]]; then
+				_values 'opção' '--dry-run[mostra a ação sem executar]' '-h[mostra ajuda]' '--help[mostra ajuda]'
           else
             _konen_actions "$words[2]"
           fi
@@ -484,9 +488,11 @@ const bashCompletion = `_konen_completion() {
       ;;
     run)
       if [[ $COMP_CWORD -eq 2 ]]; then
-        COMPREPLY=( $(compgen -W "$(konen __complete actions 2>/dev/null) $(konen __complete projects 2>/dev/null)" -- "$current") )
+		COMPREPLY=( $(compgen -W "--dry-run -h --help $(konen __complete actions 2>/dev/null) $(konen __complete projects 2>/dev/null)" -- "$current") )
       elif [[ $COMP_CWORD -eq 3 ]]; then
-        COMPREPLY=( $(compgen -W "$(konen __complete actions "${COMP_WORDS[2]}" 2>/dev/null)" -- "$current") )
+		COMPREPLY=( $(compgen -W "--dry-run -h --help $(konen __complete actions "${COMP_WORDS[2]}" 2>/dev/null)" -- "$current") )
+		else
+			COMPREPLY=( $(compgen -W '--dry-run -h --help' -- "$current") )
       fi
       ;;
     completion)
@@ -501,9 +507,11 @@ const bashCompletion = `_konen_completion() {
       elif [[ $action == edit || $action == show || $action == trust ]]; then
         COMPREPLY=( $(compgen -W "$(konen __complete projects 2>/dev/null)" -- "$current") )
       elif [[ $action == run && $COMP_CWORD -eq 3 ]]; then
-        COMPREPLY=( $(compgen -W "$(konen __complete projects 2>/dev/null)" -- "$current") )
+		COMPREPLY=( $(compgen -W "--dry-run -h --help $(konen __complete projects 2>/dev/null)" -- "$current") )
       elif [[ $action == run && $COMP_CWORD -eq 4 ]]; then
-        COMPREPLY=( $(compgen -W "$(konen __complete actions "${COMP_WORDS[3]}" 2>/dev/null)" -- "$current") )
+		COMPREPLY=( $(compgen -W "--dry-run -h --help $(konen __complete actions "${COMP_WORDS[3]}" 2>/dev/null)" -- "$current") )
+		elif [[ $action == run ]]; then
+			COMPREPLY=( $(compgen -W '--dry-run -h --help' -- "$current") )
       fi
       ;;
     *)
@@ -577,6 +585,12 @@ complete -c konen -n '__fish_seen_subcommand_from dev' -l dry-run -d 'Mostra a s
 complete -c konen -n '__fish_seen_subcommand_from dev' -a '(konen __complete projects 2>/dev/null)' -d 'Projeto'
 complete -c konen -n '__fish_seen_subcommand_from run' -l dry-run -d 'Mostra a ação sem executar a tarefa'
 complete -c konen -n '__fish_seen_subcommand_from run' -a '(konen __complete actions 2>/dev/null) (konen __complete projects 2>/dev/null)' -d 'Ação ou projeto'
-complete -c konen -n '__fish_seen_subcommand_from project' -a 'add edit list show trust run'
+complete -c konen -n '__fish_seen_subcommand_from run; and test (count (commandline -opc)) -eq 3' -a '(konen __complete actions (commandline -opc)[3] 2>/dev/null)' -d 'Ação'
+complete -c konen -n '__fish_seen_subcommand_from project; and test (count (commandline -opc)) -eq 2' -a 'add edit list show trust run'
+complete -c konen -n '__fish_seen_subcommand_from project; and __fish_seen_subcommand_from add' -F -d 'Pasta do projeto'
+complete -c konen -n '__fish_seen_subcommand_from project; and __fish_seen_subcommand_from edit show trust; and test (count (commandline -opc)) -eq 3' -a '(konen __complete projects 2>/dev/null)' -d 'Projeto'
+complete -c konen -n '__fish_seen_subcommand_from project; and __fish_seen_subcommand_from run; and test (count (commandline -opc)) -eq 3' -a '(konen __complete projects 2>/dev/null)' -d 'Projeto'
+complete -c konen -n '__fish_seen_subcommand_from project; and __fish_seen_subcommand_from run; and test (count (commandline -opc)) -eq 4' -a '(konen __complete actions (commandline -opc)[4] 2>/dev/null)' -d 'Ação'
+complete -c konen -n '__fish_seen_subcommand_from project; and __fish_seen_subcommand_from run' -l dry-run -d 'Mostra a ação sem executar a tarefa'
 complete -c konen -n '__fish_seen_subcommand_from completion' -a 'zsh bash fish'
 `

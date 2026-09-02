@@ -33,16 +33,21 @@ func (a *App) runPersonalCommand(ctx context.Context, args []string) error {
 }
 
 func (a *App) runPersonalCommandAdd(ctx context.Context, args []string) error {
-	flags := flag.NewFlagSet("command add", flag.ContinueOnError)
+	flags := flag.NewFlagSet("konen command add", flag.ContinueOnError)
 	flags.SetOutput(a.options.Err)
 	yes := flags.Bool("yes", false, "grava sem pedir confirmação")
 	dryRun := flags.Bool("dry-run", false, "mostra os arquivos sem gravar")
 	source := flags.String("from", "", "importa o conteúdo de um arquivo existente")
-	if err := flags.Parse(args); err != nil {
+	if help, err := parseCommandFlags(flags, args); err != nil {
 		return err
+	} else if help {
+		return nil
 	}
 	if flags.NArg() > 1 {
 		return errors.New("uso: konen command add [--from ARQUIVO] [--dry-run] [--yes] [NOME]")
+	}
+	if *dryRun && *yes {
+		return errors.New("use apenas --dry-run ou --yes")
 	}
 	if !a.options.Interactive && !*dryRun && !*yes {
 		return errors.New("em modo não interativo, revise com `--dry-run` ou confirme a gravação com `--yes`")

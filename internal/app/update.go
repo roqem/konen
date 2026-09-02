@@ -61,18 +61,23 @@ func defaultHTTPClient() httpDoer {
 }
 
 func (a *App) runUpdate(ctx context.Context, args []string) error {
-	flags := flag.NewFlagSet("update", flag.ContinueOnError)
+	flags := flag.NewFlagSet("konen update", flag.ContinueOnError)
 	flags.SetOutput(a.options.Err)
 	dryRun := flags.Bool("dry-run", false, "mostra versões e ações sem atualizar")
 	yes := flags.Bool("yes", false, "atualiza sem pedir confirmação")
 	pre := flags.Bool("pre", false, "inclui prereleases do Konen")
 	var only commaListFlag
 	flags.Var(&only, "only", "limita a konen ou mise")
-	if err := flags.Parse(args); err != nil {
+	if help, err := parseCommandFlags(flags, args); err != nil {
 		return err
+	} else if help {
+		return nil
 	}
 	if flags.NArg() != 0 {
 		return errors.New("update não aceita argumentos posicionais")
+	}
+	if *dryRun && *yes {
+		return errors.New("use apenas --dry-run ou --yes")
 	}
 	if len(only) == 0 {
 		only = []string{"konen", "mise"}

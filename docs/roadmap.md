@@ -77,13 +77,15 @@ depender de aliases obscuros.
 Objetivo: estabilizar o contrato antes de ampliar distribuição e integrações.
 
 - [x] automatizar um smoke test público em ambiente Linux descartável;
-- manter a qualificação manual com um estado privado representativo;
+- [x] manter a qualificação manual com um estado privado representativo;
 - [x] testar instalação, atualização, interrupção de rede e reaplicação;
 - [x] revisar mensagens e documentação com linguagem direta e natural;
 - [x] documentar plataformas suportadas e limites conhecidos;
 - [x] definir política de compatibilidade e migração de versões;
-- publicar a primeira beta somente quando um estado criado numa alpha puder ser
-  atualizado sem reconstrução manual.
+- [x] comprovar que um estado criado numa alpha pode ser atualizado e migrado
+  sem reconstrução manual;
+- publicar a primeira beta somente depois da revisão final do código, da
+  documentação e do histórico público.
 
 Depois da beta, entram em avaliação pacote `.deb`, repositório APT assinado,
 outros terminais e perfis de máquina. O onboarding poderá apresentar checkboxes

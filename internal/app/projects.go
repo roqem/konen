@@ -19,6 +19,9 @@ func (a *App) runProject(ctx context.Context, args []string) error {
 	if len(args) == 0 {
 		return errors.New("informe uma ação: add, edit, list, show, trust ou run")
 	}
+	if len(args) == 2 && (args[1] == "-h" || args[1] == "--help") {
+		return a.printProjectActionHelp(args[0])
+	}
 	stateDir, err := a.loadState()
 	if err != nil {
 		return err
@@ -94,6 +97,28 @@ func (a *App) runProject(ctx context.Context, args []string) error {
 	default:
 		return fmt.Errorf("ação de projeto desconhecida: %s", args[0])
 	}
+}
+
+func (a *App) printProjectActionHelp(action string) error {
+	var usage string
+	switch action {
+	case "add":
+		usage = "konen project add [DIR]"
+	case "edit":
+		usage = "konen project edit NOME"
+	case "list":
+		usage = "konen project list"
+	case "show":
+		usage = "konen project show NOME"
+	case "trust":
+		usage = "konen project trust NOME"
+	case "run":
+		usage = "konen project run NOME AÇÃO [--dry-run]"
+	default:
+		return fmt.Errorf("ação de projeto desconhecida: %s", action)
+	}
+	a.printCommandGroup("Uso", [][2]string{{usage, "mostra ou executa esta operação de projeto"}})
+	return nil
 }
 
 func (a *App) runProjectShortcut(ctx context.Context, args []string) error {
@@ -264,6 +289,16 @@ func (a *App) manifestFromAnswer(answer ui.ProjectAnswer) (project.Manifest, err
 }
 
 func (a *App) runNamedProjectAction(ctx context.Context, args []string, projectRequired bool) error {
+	for _, arg := range args {
+		if arg == "-h" || arg == "--help" {
+			usage := "konen run [PROJETO] AÇÃO [--dry-run]"
+			if projectRequired {
+				usage = "konen project run NOME AÇÃO [--dry-run]"
+			}
+			a.printCommandGroup("Uso", [][2]string{{usage, "executa ou inspeciona uma ação"}})
+			return nil
+		}
+	}
 	positionals, dryRun, err := parseProjectActionArgs(args)
 	if err != nil {
 		return err
@@ -354,8 +389,6 @@ func parseProjectActionArgs(args []string) ([]string, bool, error) {
 		switch arg {
 		case "--dry-run":
 			dryRun = true
-		case "-h", "--help":
-			return nil, false, errors.New("uso: konen run [PROJETO] AÇÃO [--dry-run]")
 		default:
 			if strings.HasPrefix(arg, "-") {
 				return nil, false, fmt.Errorf("opção desconhecida: %s", arg)

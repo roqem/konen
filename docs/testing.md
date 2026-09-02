@@ -43,7 +43,7 @@ created. The release workflow fails when this post-publication journey fails.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.21` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.22` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -60,7 +60,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.21 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.22 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -138,16 +138,16 @@ To qualify the updater itself, install the immediately preceding prerelease in
 a disposable VM, then let it discover this candidate:
 
 ```console
-KONEN_VERSION=v0.1.0-alpha.20 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.21 sh install.sh
 konen update --dry-run --only konen
 konen version
 konen update --yes --only konen
 konen version
 ```
 
-The dry run must show alpha.20 as current and alpha.21 as available without
+The dry run must show alpha.21 as current and alpha.22 as available without
 changing the first `konen version`. The confirmed command must verify, stage and
-install alpha.21. The configured state path and its Git status must remain
+install alpha.22. The configured state path and its Git status must remain
 unchanged.
 
 Qualify format migration with an isolated configuration and state, never the
@@ -344,10 +344,11 @@ the test is deliberately allowed to change that disposable home.
 
 ## Latest qualification record
 
-`v0.1.0-alpha.6` passed the complete manual journey on 2026-08-31 in a clean
-Multipass VM running Ubuntu 26.04 LTS on `linux/amd64` with two CPUs and 4 GiB
-of memory. The private representative state required GitHub device login and
-then converged:
+The representative private state passed the complete manual journey from
+`v0.1.0-alpha.6` through `v0.1.0-alpha.21` between 2026-08-31 and 2026-09-02 in
+a clean Multipass VM running Ubuntu 26.04 LTS on `linux/amd64` with two CPUs and
+4 GiB of memory. The initial restore required GitHub device login and then
+converged:
 
 - 24 apt packages and three auxiliary Git repositories;
 - eight dotfile entries;
@@ -361,3 +362,11 @@ A second `konen plan` reported every declarative resource current. A second
 guards exited without reinstalling or changing the machine. `konen doctor`
 reported configuration, state, executable-surface approval, mise and Git as
 healthy.
+
+The same installation later updated itself from `v0.1.0-alpha.19` to
+`v0.1.0-alpha.21`, migrated four project manifests from v1 to v2 with local
+backups and required fresh approval for each migrated manifest. It then applied
+the representative state twice: the first run converged the remaining dotfile,
+and the second found all 52 declarative resources ready while the four personal
+tasks completed through their idempotence guards. No manual reconstruction of
+the alpha state was required.

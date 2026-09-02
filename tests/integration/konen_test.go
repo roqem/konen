@@ -43,7 +43,7 @@ func TestInstallerInstallsUpdatesAndRejectsCorruption(t *testing.T) {
 
 	sudoMarker := filepath.Join(root, "sudo-was-called")
 	shimDir := filepath.Join(root, "shims")
-	for _, command := range []string{"awk", "curl", "gzip", "install", "mkdir", "mktemp", "rm", "sha256sum", "tar", "uname"} {
+	for _, command := range []string{"awk", "curl", "gzip", "install", "mkdir", "mktemp", "mv", "rm", "sha256sum", "tar", "uname"} {
 		linkCommand(t, shimDir, command)
 	}
 	writeExecutable(t, filepath.Join(shimDir, "sudo"), "#!/bin/sh\n: > \"$KONEN_TEST_SUDO_MARKER\"\nexit 99\n")
@@ -128,6 +128,28 @@ func TestInstallerInstallsUpdatesAndRejectsCorruption(t *testing.T) {
 	if data, err := os.ReadFile(stateMarker); err != nil || string(data) != "preserved\n" {
 		t.Fatalf("failed update changed state: data=%q error=%v", data, err)
 	}
+
+	wrongContentVersion := "0.1.0-test.wrong-content"
+	wrongArchive := createKonenRelease(t, releases, wrongContentVersion, architecture)
+	advertisedVersion := "0.1.0-test.mismatch"
+	advertisedDir := filepath.Join(releases, "konen", "download", "v"+advertisedVersion)
+	if err := os.MkdirAll(advertisedDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	advertisedAsset := fmt.Sprintf("konen_%s_linux_%s.tar.gz", advertisedVersion, architecture)
+	advertisedArchive := filepath.Join(advertisedDir, advertisedAsset)
+	copyFile(t, wrongArchive, advertisedArchive, 0o644)
+	writeChecksums(t, filepath.Join(advertisedDir, "checksums.txt"), advertisedAsset, advertisedArchive)
+	latest.Set(advertisedVersion)
+	failedOutput, err = runCommandError(repository, environment, "/bin/sh", installScript)
+	if err == nil {
+		t.Fatal("installer accepted an executable with an unexpected version")
+	}
+	assertContains(t, failedOutput, "o executável baixado informou "+wrongContentVersion)
+	if got := fileDigest(t, installedKonen); got != installedDigest {
+		t.Fatal("version mismatch replaced the working Konen executable")
+	}
+	assertNoMatches(t, filepath.Join(filepath.Dir(installedKonen), ".konen-install.*"))
 
 	thirdVersion := "0.1.0-test.3"
 	createKonenRelease(t, releases, thirdVersion, architecture)

@@ -24,7 +24,8 @@ require_command() {
 download() {
   source_url=$1
   destination=$2
-  if ! curl -fL --retry 3 --retry-delay 1 --connect-timeout 15 \
+  if ! curl -fL --retry 3 --retry-all-errors --retry-delay 1 \
+    --connect-timeout 15 --max-time 300 \
     "$source_url" -o "$destination"; then
     fail "não foi possível baixar $source_url"
   fi
@@ -99,6 +100,8 @@ require_command sha256sum
 require_command install
 require_command mktemp
 require_command mkdir
+require_command mv
+require_command rm
 require_command uname
 
 [ "$(uname -s)" = "Linux" ] || fail "esta versão do instalador suporta somente Linux"
@@ -142,7 +145,14 @@ case "$version" in
 esac
 
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/konen-install.XXXXXX")
-trap 'rm -rf -- "$temporary_dir"' 0 1 2 15
+staged_konen=""
+staged_mise=""
+cleanup() {
+  rm -rf -- "$temporary_dir"
+  [ -z "$staged_konen" ] || rm -f -- "$staged_konen"
+  [ -z "$staged_mise" ] || rm -f -- "$staged_mise"
+}
+trap cleanup 0 1 2 15
 
 archive="konen_${version}_linux_${architecture}.tar.gz"
 archive_path="$temporary_dir/$archive"
@@ -155,8 +165,11 @@ download "$download_root/checksums.txt" "$checksums_path"
 verify_checksum "$archive_path" "$checksums_path" "$archive"
 
 mkdir -p "$temporary_dir/konen"
-tar -xzf "$archive_path" -C "$temporary_dir/konen"
-[ -f "$temporary_dir/konen/konen" ] || fail "o archive não contém o executável konen"
+if ! tar -xzf "$archive_path" -C "$temporary_dir/konen" konen; then
+  fail "não foi possível extrair o executável konen do archive"
+fi
+[ -f "$temporary_dir/konen/konen" ] && [ ! -L "$temporary_dir/konen/konen" ] ||
+  fail "o archive não contém um executável konen regular"
 
 mise_was_installed=0
 if [ "$install_mise" != "0" ]; then
@@ -183,10 +196,28 @@ if [ "$install_mise" != "0" ]; then
 fi
 
 install -d "$install_dir"
-install -m 0755 "$temporary_dir/konen/konen" "$install_dir/konen"
+[ ! -d "$install_dir/konen" ] || fail "$install_dir/konen é um diretório"
+
+staged_konen=$(mktemp "$install_dir/.konen-install.XXXXXX")
+install -m 0755 "$temporary_dir/konen/konen" "$staged_konen"
+staged_konen_version=$("$staged_konen" version 2>/dev/null || true)
+staged_konen_version=${staged_konen_version#v}
+[ "$staged_konen_version" = "$version" ] ||
+  fail "o executável baixado informou ${staged_konen_version:-uma versão inválida}; esperado $version"
+
 if [ "$mise_was_installed" = "1" ]; then
-  install -m 0755 "$mise_path_tmp" "$install_dir/mise"
+  [ ! -d "$install_dir/mise" ] || fail "$install_dir/mise é um diretório"
+  staged_mise=$(mktemp "$install_dir/.mise-install.XXXXXX")
+  install -m 0755 "$mise_path_tmp" "$staged_mise"
+  staged_mise_version=$(installed_mise_version "$staged_mise" || true)
+  [ "$staged_mise_version" = "$mise_version" ] ||
+    fail "o executável do mise informou ${staged_mise_version:-uma versão inválida}; esperado $mise_version"
+
+  mv -f -- "$staged_mise" "$install_dir/mise"
+  staged_mise=""
 fi
+mv -f -- "$staged_konen" "$install_dir/konen"
+staged_konen=""
 
 say "Konen $version instalado em $install_dir/konen"
 if [ "$mise_was_installed" = "1" ]; then

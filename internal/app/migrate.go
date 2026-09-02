@@ -50,12 +50,14 @@ func (p migrationPlan) pending() []migrationItem {
 }
 
 func (a *App) runMigrate(args []string) error {
-	flags := flag.NewFlagSet("migrate", flag.ContinueOnError)
+	flags := flag.NewFlagSet("konen migrate", flag.ContinueOnError)
 	flags.SetOutput(a.options.Err)
 	dryRun := flags.Bool("dry-run", false, "mostra migrações sem alterar arquivos")
 	yes := flags.Bool("yes", false, "migra sem pedir confirmação")
-	if err := flags.Parse(args); err != nil {
+	if help, err := parseCommandFlags(flags, args); err != nil {
 		return err
+	} else if help {
+		return nil
 	}
 	if flags.NArg() != 0 {
 		return errors.New("migrate não aceita argumentos posicionais")

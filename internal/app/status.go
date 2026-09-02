@@ -26,14 +26,16 @@ type statusRow struct {
 }
 
 func (a *App) runStatus(ctx context.Context, args []string) error {
-	flags := flag.NewFlagSet("status", flag.ContinueOnError)
+	flags := flag.NewFlagSet("konen status", flag.ContinueOnError)
 	flags.SetOutput(a.options.Err)
 	var only commaListFlag
 	var states commaListFlag
 	flags.Var(&only, "only", "limita a categorias separadas por vírgula")
 	flags.Var(&states, "state", "limita a situações separadas por vírgula")
-	if err := flags.Parse(args); err != nil {
+	if help, err := parseCommandFlags(flags, args); err != nil {
 		return err
+	} else if help {
+		return nil
 	}
 	if flags.NArg() != 0 {
 		return errors.New("status não aceita argumentos posicionais")

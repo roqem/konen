@@ -78,6 +78,12 @@ func (a *App) run(ctx context.Context, args []string) error {
 		}
 		return a.run(ctx, []string{action})
 	}
+	if len(args) == 2 && isHelpArgument(args[1]) && a.printTopLevelCommandHelp(args[0]) {
+		return nil
+	}
+	if len(args) == 3 && isHelpArgument(args[2]) && a.printNestedCommandHelp(args[0], args[1]) {
+		return nil
+	}
 
 	switch args[0] {
 	case "init":
@@ -85,11 +91,14 @@ func (a *App) run(ctx context.Context, args []string) error {
 	case "status":
 		return a.runStatus(ctx, args[1:])
 	case "plan":
-		return a.runApply(ctx, append([]string{"--dry-run"}, args[1:]...))
+		return a.runApply(ctx, append([]string{"--dry-run"}, args[1:]...), "plan")
 	case "diff":
+		if len(args) != 1 {
+			return errors.New("diff não aceita argumentos")
+		}
 		return a.runMise(ctx, []string{"bootstrap", "dotfiles", "diff"})
 	case "apply":
-		return a.runApply(ctx, args[1:])
+		return a.runApply(ctx, args[1:], "apply")
 	case "tool":
 		return a.runTool(ctx, args[1:])
 	case "package":
@@ -107,6 +116,9 @@ func (a *App) run(ctx context.Context, args []string) error {
 	case "trust":
 		return a.runTrust(ctx, args[1:])
 	case "doctor":
+		if len(args) != 1 {
+			return errors.New("doctor não aceita argumentos")
+		}
 		return a.runDoctor(ctx)
 	case "update":
 		return a.runUpdate(ctx, args[1:])
@@ -138,17 +150,26 @@ func (a *App) run(ctx context.Context, args []string) error {
 	case "__installer_add":
 		return a.runPersonalInstaller(ctx, []string{"add"})
 	case "__plan_select":
-		return a.runApply(ctx, []string{"--dry-run", "--select"})
+		return a.runApply(ctx, []string{"--dry-run", "--select"}, "plan")
 	case "__apply_select":
-		return a.runApply(ctx, []string{"--select"})
+		return a.runApply(ctx, []string{"--select"}, "apply")
 	case "__exit":
+		if len(args) != 1 {
+			return errors.New("comando interno inválido")
+		}
 		return nil
 	case "__complete":
 		return a.runInternalComplete(args[1:])
 	case "version", "--version", "-v":
+		if len(args) != 1 {
+			return errors.New("version não aceita argumentos")
+		}
 		fmt.Fprintln(a.options.Out, a.options.Version)
 		return nil
 	case "help", "--help", "-h":
+		if len(args) != 1 {
+			return errors.New("help não aceita argumentos; use `konen COMANDO --help`")
+		}
 		a.printHelp()
 		return nil
 	default:
@@ -157,15 +178,20 @@ func (a *App) run(ctx context.Context, args []string) error {
 }
 
 func (a *App) runInit(ctx context.Context, args []string) error {
-	flags := flag.NewFlagSet("init", flag.ContinueOnError)
+	flags := flag.NewFlagSet("konen init", flag.ContinueOnError)
 	flags.SetOutput(a.options.Err)
 	initializeGit := flags.Bool("git", false, "inicializa um repositório Git")
 	remote := flags.String("from", "", "clona um estado Git; use github:OWNER/REPO para login assistido")
-	if err := flags.Parse(args); err != nil {
+	if help, err := parseCommandFlags(flags, args); err != nil {
 		return err
+	} else if help {
+		return nil
 	}
 	if flags.NArg() > 1 {
 		return errors.New("init aceita no máximo um caminho")
+	}
+	if *initializeGit && *remote != "" {
+		return errors.New("use apenas uma origem: --git cria um estado local; --from clona um estado existente")
 	}
 
 	defaultPath := filepath.Join(a.options.HomeDir, ".local", "share", "konen", "state")
@@ -180,6 +206,9 @@ func (a *App) runInit(ctx context.Context, args []string) error {
 		answer, err = a.options.Prompter.Init(defaultPath)
 		if err != nil {
 			return err
+		}
+		if *initializeGit && answer.Remote == "" {
+			answer.InitializeGit = true
 		}
 	}
 
@@ -241,19 +270,27 @@ func (a *App) runInit(ctx context.Context, args []string) error {
 	return nil
 }
 
-func (a *App) runApply(ctx context.Context, args []string) error {
-	flags := flag.NewFlagSet("apply", flag.ContinueOnError)
+func (a *App) runApply(ctx context.Context, args []string, commandName string) error {
+	flags := flag.NewFlagSet("konen "+commandName, flag.ContinueOnError)
 	flags.SetOutput(a.options.Err)
-	yes := flags.Bool("yes", false, "não pede confirmação")
+	var yes bool
+	if commandName == "apply" {
+		flags.BoolVar(&yes, "yes", false, "não pede confirmação")
+	}
 	dryRun := flags.Bool("dry-run", false, "mostra o plano sem alterar a máquina")
 	selectParts := flags.Bool("select", false, "escolhe as etapas interativamente")
 	var only commaListFlag
 	flags.Var(&only, "only", "limita a etapas separadas por vírgula")
-	if err := flags.Parse(args); err != nil {
+	if help, err := parseCommandFlags(flags, args); err != nil {
 		return err
+	} else if help {
+		return nil
 	}
 	if flags.NArg() != 0 {
-		return errors.New("apply não aceita argumentos posicionais")
+		return fmt.Errorf("%s não aceita argumentos posicionais", commandName)
+	}
+	if *dryRun && yes {
+		return errors.New("use apenas --dry-run ou --yes")
 	}
 	if *selectParts && len(only) > 0 {
 		return errors.New("use apenas uma forma de seleção: --select ou --only")
@@ -281,7 +318,7 @@ func (a *App) runApply(ctx context.Context, args []string) error {
 		miseArgs = append(miseArgs, "--only", strings.Join(only, ","))
 		fmt.Fprintf(a.options.Out, "Etapas selecionadas: %s\n", strings.Join(applyPartLabels(only), ", "))
 	}
-	if *yes {
+	if yes {
 		miseArgs = append(miseArgs, "--yes")
 	}
 	if *dryRun {
@@ -336,11 +373,13 @@ func (a *App) runDotfile(ctx context.Context, args []string) error {
 }
 
 func (a *App) runDotfileAdd(ctx context.Context, args []string) error {
-	flags := flag.NewFlagSet("dotfile add", flag.ContinueOnError)
+	flags := flag.NewFlagSet("konen dotfile add", flag.ContinueOnError)
 	flags.SetOutput(a.options.Err)
 	mode := flags.String("mode", "", "modo do dotfile: symlink, copy ou template")
-	if err := flags.Parse(args); err != nil {
+	if help, err := parseCommandFlags(flags, args); err != nil {
 		return err
+	} else if help {
+		return nil
 	}
 	targets := flags.Args()
 	if len(targets) == 0 {
@@ -634,6 +673,110 @@ func (a *App) loadState() (string, error) {
 
 func (a *App) stateTrust() state.TrustStore {
 	return state.TrustStore{Path: filepath.Join(filepath.Dir(a.options.ConfigPath), "state-trust.toml")}
+}
+
+func parseCommandFlags(flags *flag.FlagSet, args []string) (bool, error) {
+	if err := flags.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return true, nil
+		}
+		return false, err
+	}
+	return false, nil
+}
+
+func isHelpArgument(argument string) bool {
+	return argument == "-h" || argument == "--help"
+}
+
+func (a *App) printTopLevelCommandHelp(command string) bool {
+	var commands [][2]string
+	switch command {
+	case "init":
+		commands = [][2]string{
+			{"konen init [--git] [DIR]", "cria e configura um estado local"},
+			{"konen init --from ORIGEM [DIR]", "clona e configura um estado existente"},
+		}
+	case "status":
+		commands = [][2]string{{"konen status [--only CATEGORIAS] [--state SITUAÇÕES]", "mostra e filtra o estado declarado"}}
+	case "plan":
+		commands = [][2]string{{"konen plan [--select | --only ETAPAS]", "mostra o que mudaria sem aplicar"}}
+	case "diff":
+		commands = [][2]string{{"konen diff", "mostra diferenças dos dotfiles"}}
+	case "apply":
+		commands = [][2]string{{"konen apply [--yes] [--select | --only ETAPAS]", "aplica o estado selecionado"}}
+	case "migrate":
+		commands = [][2]string{{"konen migrate [--dry-run | --yes]", "revisa ou aplica migrações de formato"}}
+	case "update":
+		commands = [][2]string{{"konen update [--dry-run | --yes] [--only konen,mise]", "revisa ou aplica atualizações"}}
+	case "tool":
+		commands = [][2]string{{"konen tool add [NOME] [VERSÃO]", "adiciona ou atualiza uma ferramenta"}}
+	case "package":
+		commands = [][2]string{{"konen package add [--manager M] PACOTE [VERSÃO]", "adiciona um pacote ao estado"}}
+	case "repo":
+		commands = [][2]string{{"konen repo add DESTINO URL [REF]", "adiciona um checkout Git ao estado"}}
+	case "command":
+		commands = [][2]string{{"konen command add [--from ARQUIVO] [NOME]", "cria ou importa um comando pessoal"}}
+	case "installer":
+		commands = [][2]string{{"konen installer add [--from ARQUIVO] [NOME]", "cria ou importa um instalador pessoal"}}
+	case "dotfile":
+		commands = [][2]string{{"konen dotfile add [--mode MODO] CAMINHO...", "adiciona arquivos de configuração"}}
+	case "projects":
+		commands = [][2]string{{"konen projects", "lista os projetos cadastrados"}}
+	case "project":
+		commands = [][2]string{
+			{"konen project add [DIR]", "cadastra um projeto"},
+			{"konen project edit NOME", "edita ações e abas"},
+			{"konen project list", "lista os projetos"},
+			{"konen project show NOME", "mostra o manifesto"},
+			{"konen project trust NOME", "aprova o manifesto após revisão"},
+			{"konen project run NOME AÇÃO [--dry-run]", "executa ou inspeciona uma ação"},
+		}
+	case "dev":
+		commands = [][2]string{{"konen dev [NOME] [--dry-run]", "abre ou inspeciona uma sessão"}}
+	case "run":
+		commands = [][2]string{{"konen run [PROJETO] AÇÃO [--dry-run]", "executa ou inspeciona uma ação"}}
+	case "trust":
+		commands = [][2]string{{"konen trust", "aprova mise.toml, tarefas e comandos"}}
+	case "doctor":
+		commands = [][2]string{{"konen doctor", "diagnostica a instalação"}}
+	case "completion":
+		commands = [][2]string{{"konen completion zsh|bash|fish", "gera o autocomplete"}}
+	case "version":
+		commands = [][2]string{{"konen version", "mostra a versão instalada"}}
+	case "help":
+		a.printHelp()
+		return true
+	default:
+		return false
+	}
+	a.printCommandGroup("Uso", commands)
+	return true
+}
+
+func (a *App) printNestedCommandHelp(group, action string) bool {
+	if action != "add" {
+		return false
+	}
+	var usage, description string
+	switch group {
+	case "tool":
+		usage, description = "konen tool add [--dry-run | --yes] NOME [VERSÃO]", "adiciona ou atualiza uma ferramenta"
+	case "package":
+		usage, description = "konen package add [--manager M] [--dry-run | --yes] PACOTE [VERSÃO]", "adiciona um pacote ao estado"
+	case "repo":
+		usage, description = "konen repo add [--dry-run | --yes] DESTINO URL [REF]", "adiciona um checkout Git ao estado"
+	case "command":
+		usage, description = "konen command add [--from ARQUIVO] [--dry-run | --yes] [NOME]", "cria ou importa um comando pessoal"
+	case "installer":
+		usage, description = "konen installer add [--from ARQUIVO] [--dry-run | --yes] [NOME]", "cria ou importa um instalador pessoal"
+	case "dotfile":
+		usage, description = "konen dotfile add [--mode MODO] CAMINHO...", "adiciona arquivos de configuração"
+	default:
+		return false
+	}
+	a.printCommandGroup("Uso", [][2]string{{usage, description}})
+	return true
 }
 
 func (a *App) printHelp() {

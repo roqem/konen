@@ -140,6 +140,11 @@ type toolPrompter struct {
 	confirmed bool
 }
 
+type initPrompter struct {
+	unusedPrompter
+	answer ui.InitAnswer
+}
+
 func (p menuPrompter) Menu(bool) (string, error) {
 	return p.action, p.err
 }
@@ -154,6 +159,10 @@ func (p toolPrompter) Tool(ui.ToolAnswer) (ui.ToolAnswer, error) {
 
 func (p toolPrompter) Confirm(string) (bool, error) {
 	return p.confirmed, nil
+}
+
+func (p initPrompter) Init(string) (ui.InitAnswer, error) {
+	return p.answer, nil
 }
 
 var _ execx.Runner = (*fakeRunner)(nil)
@@ -582,6 +591,68 @@ func TestHelpGroupsCommandsAndSeparatesAddOperations(t *testing.T) {
 	if strings.Contains(out.String(), "\n  konen add ") {
 		t.Fatalf("help still advertises ambiguous add:\n%s", out.String())
 	}
+}
+
+func TestCommandHelpReturnsSuccessWithoutConfiguration(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		args     []string
+		fragment string
+	}{
+		{name: "apply", args: []string{"apply", "--help"}, fragment: "konen apply"},
+		{name: "tool add", args: []string{"tool", "add", "--help"}, fragment: "konen tool add"},
+		{name: "project group", args: []string{"project", "--help"}, fragment: "konen project add"},
+		{name: "project action", args: []string{"project", "run", "--help"}, fragment: "konen project run"},
+		{name: "run", args: []string{"run", "--help"}, fragment: "konen run"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var output bytes.Buffer
+			application := New(Options{Out: &output, Err: &output})
+			if err := application.Run(context.Background(), test.args); err != nil {
+				t.Fatalf("help returned error: %v", err)
+			}
+			assertOutputContains(t, output.String(), test.fragment)
+			if strings.Contains(output.String(), "flag: help requested") {
+				t.Fatalf("help exposed the flag package error: %s", output.String())
+			}
+		})
+	}
+}
+
+func TestCommandsRejectContradictoryFlagsAndExtraArguments(t *testing.T) {
+	for _, args := range [][]string{
+		{"init", "--git", "--from", "https://example.invalid/state.git", "/tmp/state"},
+		{"apply", "--dry-run", "--yes"},
+		{"plan", "--yes"},
+		{"diff", "extra"},
+		{"doctor", "extra"},
+		{"version", "extra"},
+	} {
+		application := New(Options{Out: &bytes.Buffer{}, Err: &bytes.Buffer{}})
+		if err := application.Run(context.Background(), args); err == nil {
+			t.Errorf("%v unexpectedly succeeded", args)
+		}
+	}
+}
+
+func TestInteractiveInitKeepsExplicitGitFlag(t *testing.T) {
+	root := t.TempDir()
+	stateDir := filepath.Join(root, "state")
+	runner := &fakeRunner{paths: map[string]string{"git": "/bin/git", "mise": "/bin/mise"}}
+	application := New(Options{
+		ConfigPath: filepath.Join(root, "config", "config.toml"), HomeDir: root,
+		Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, Runner: runner, Interactive: true,
+		Prompter: initPrompter{answer: ui.InitAnswer{Path: stateDir}},
+	})
+	if err := application.Run(context.Background(), []string{"init", "--git"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, call := range runner.runs {
+		if call.name == "git" && reflect.DeepEqual(call.args, []string{"init", "--initial-branch=main"}) {
+			return
+		}
+	}
+	t.Fatalf("explicit --git was lost after the prompt: %#v", runner.runs)
 }
 
 func TestProjectAddGuidedFlowSavesAndTrustsManifest(t *testing.T) {

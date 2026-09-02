@@ -191,20 +191,18 @@ auth storage, plaintext Git credentials, `.netrc` and SSH private keys.
 
 ### Themes
 
-Theme persistence is a legitimate future Konen extension. The legacy behavior
-coordinates Starship presets and Kitty themes, preserves local customization and
-prevents theme tools from silently resetting the desired state. This belongs
-near state capture/apply and is planned as `konen theme`, not as a separate
-repository for now.
-
-The implementation must write the selected result back into managed state,
-rather than keeping ad-hoc backup files beside live configuration.
+Theme persistence is currently best expressed as a personal command in the
+versioned state. Such a command can coordinate Starship presets and Kitty
+themes, write the selected result back into managed state and then update the
+live files. This keeps personal taste outside the Konen binary while preserving
+the same review and backup path as other personal automation. A core adapter is
+only justified later if several independent states reveal the same reusable
+contract.
 
 ### Safe paste for Zsh
 
 The large-paste widget is independent of workstation convergence and hooks into
-security-sensitive shell behavior. It is not part of the Konen core. It may be
-extracted into a dedicated Zsh plugin after it has focused automated tests for
-buffer handling, cancellation, temporary files and the no-execution fallbacks.
-
-Until then, users can keep the legacy script in their personal state repository.
+security-sensitive shell behavior. It therefore lives in the separate
+[`roqem/zsh-safe-paste`](https://github.com/roqem/zsh-safe-paste) plugin rather
+than in the Konen core. A personal state may declare that repository and source
+the plugin from its Zsh configuration like any other explicit dependency.

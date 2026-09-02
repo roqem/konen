@@ -59,7 +59,7 @@ O fluxo guiado grava `projects/NOME.toml` no estado do Konen:
 
 ```toml
 version = 2
-path = "~/Documents/Projects/my-app"
+path = "~/Projects/my-app"
 keep_invoking_tab = false
 
 [actions.checks]

@@ -26,16 +26,21 @@ func (a *App) runPackage(ctx context.Context, args []string) error {
 }
 
 func (a *App) runPackageAdd(ctx context.Context, args []string) error {
-	flags := flag.NewFlagSet("package add", flag.ContinueOnError)
+	flags := flag.NewFlagSet("konen package add", flag.ContinueOnError)
 	flags.SetOutput(a.options.Err)
 	yes := flags.Bool("yes", false, "grava sem pedir confirmação")
 	dryRun := flags.Bool("dry-run", false, "mostra a alteração sem gravar")
 	manager := flags.String("manager", "", "gerenciador do sistema, como apt ou brew")
-	if err := flags.Parse(args); err != nil {
+	if help, err := parseCommandFlags(flags, args); err != nil {
 		return err
+	} else if help {
+		return nil
 	}
 	if flags.NArg() > 2 {
 		return errors.New("uso: konen package add [--manager GERENCIADOR] [--dry-run] PACOTE [VERSÃO]")
+	}
+	if *dryRun && *yes {
+		return errors.New("use apenas --dry-run ou --yes")
 	}
 	if !a.options.Interactive && !*dryRun && !*yes {
 		return errors.New("em modo não interativo, revise com `--dry-run` ou confirme a gravação com `--yes`")
