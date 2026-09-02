@@ -586,7 +586,7 @@ func createMiseRelease(t *testing.T, root, architecture string) {
 	}
 	assetName := fmt.Sprintf("mise-v%s-linux-%s", testMiseVersion, architecture)
 	assetPath := filepath.Join(releaseDir, assetName)
-	writeExecutable(t, assetPath, "#!/bin/sh\nprintf '"+testMiseVersion+" linux-fixture\\n'\n")
+	writeExecutable(t, assetPath, "#!/bin/sh\n[ \"${0##*/}\" = mise ] || { printf 'mise fixture must run as mise\\n' >&2; exit 1; }\nprintf '"+testMiseVersion+" linux-fixture\\n'\n")
 	writeChecksums(t, filepath.Join(releaseDir, "SHASUMS256.txt"), assetName, assetPath)
 }
 

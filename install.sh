@@ -147,10 +147,12 @@ esac
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/konen-install.XXXXXX")
 staged_konen=""
 staged_mise=""
+staged_konen_dir=""
+staged_mise_dir=""
 cleanup() {
   rm -rf -- "$temporary_dir"
-  [ -z "$staged_konen" ] || rm -f -- "$staged_konen"
-  [ -z "$staged_mise" ] || rm -f -- "$staged_mise"
+  [ -z "$staged_konen_dir" ] || rm -rf -- "$staged_konen_dir"
+  [ -z "$staged_mise_dir" ] || rm -rf -- "$staged_mise_dir"
 }
 trap cleanup 0 1 2 15
 
@@ -198,7 +200,8 @@ fi
 install -d "$install_dir"
 [ ! -d "$install_dir/konen" ] || fail "$install_dir/konen é um diretório"
 
-staged_konen=$(mktemp "$install_dir/.konen-install.XXXXXX")
+staged_konen_dir=$(mktemp -d "$install_dir/.konen-install.XXXXXX")
+staged_konen="$staged_konen_dir/konen"
 install -m 0755 "$temporary_dir/konen/konen" "$staged_konen"
 staged_konen_version=$("$staged_konen" version 2>/dev/null || true)
 staged_konen_version=${staged_konen_version#v}
@@ -207,7 +210,8 @@ staged_konen_version=${staged_konen_version#v}
 
 if [ "$mise_was_installed" = "1" ]; then
   [ ! -d "$install_dir/mise" ] || fail "$install_dir/mise é um diretório"
-  staged_mise=$(mktemp "$install_dir/.mise-install.XXXXXX")
+  staged_mise_dir=$(mktemp -d "$install_dir/.mise-install.XXXXXX")
+  staged_mise="$staged_mise_dir/mise"
   install -m 0755 "$mise_path_tmp" "$staged_mise"
   staged_mise_version=$(installed_mise_version "$staged_mise" || true)
   [ "$staged_mise_version" = "$mise_version" ] ||
