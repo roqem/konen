@@ -134,18 +134,18 @@ Expected results:
 - the state is an ordinary Git repository, Konen explains that it did not
   commit anything, and its initial files are visible as untracked.
 
-To qualify the updater itself, install the immediately preceding prerelease in
-a disposable VM, then let it discover this candidate:
+To qualify the updater itself, install the retained migration baseline in a
+disposable VM, then let it discover this candidate:
 
 ```console
-KONEN_VERSION=v0.1.0-alpha.22 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.21 sh install.sh
 konen update --dry-run --only konen
 konen version
 konen update --yes --only konen
 konen version
 ```
 
-The dry run must show alpha.22 as current and alpha.23 as available without
+The dry run must show alpha.21 as current and alpha.23 as available without
 changing the first `konen version`. The confirmed command must verify, stage and
 install alpha.23. The configured state path and its Git status must remain
 unchanged.
