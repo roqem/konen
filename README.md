@@ -15,6 +15,13 @@ estado em outra máquina. O trabalho de instalação e sincronização é feito 
 Não é preciso conhecer mise para começar. Este README apresenta o fluxo do
 zero; os documentos em [`docs/`](docs/) aprofundam as decisões técnicas.
 
+- [Instalação](#instalação) e [primeiro uso](#começando-do-zero)
+- [Restaurar um backup](#restaurando-um-backup-existente)
+- [Personalizar a máquina](#personalizando-sua-máquina)
+- [Projetos, abas e edição pelo Neovim](#projetos-e-abas-do-terminal)
+- [Referência de comandos](#comandos-do-dia-a-dia)
+- [Atualizações](#atualizando-o-konen-e-o-mise) e [desenvolvimento](#desenvolvimento-do-konen)
+
 ## Situação do projeto
 
 Konen está em **alpha**: o fluxo completo já foi validado em uma VM Ubuntu
@@ -28,6 +35,19 @@ Plataformas qualificadas, limites conhecidos e a política de migração estão 
 Konen não é outro gerenciador de pacotes. Ele cuida da experiência inicial,
 segurança, diagnóstico e sessões de projetos; mise continua sendo a fonte da
 verdade sobre o conteúdo da máquina.
+
+### Código em desenvolvimento e versão publicada
+
+Este README acompanha a branch `main`. A versão instalável publicada é a
+[`v0.1.0-alpha.23`](https://github.com/roqem/konen/releases/tag/v0.1.0-alpha.23);
+seu comportamento está descrito no
+[README daquela versão](https://github.com/roqem/konen/blob/v0.1.0-alpha.23/README.md).
+
+O gerenciador `konen project`, a edição direta e ordenação de abas, o retorno ao
+shell por padrão, `--tab` e a edição de tarefas no Neovim estão em `main` e
+ainda não fazem parte da alpha.23. Para usá-los antes da próxima release,
+[compile o código atual](#desenvolvimento-do-konen). Fazer `git pull` atualiza o
+código; `konen update` atualiza o executável a partir de releases publicadas.
 
 ## Instalação
 
@@ -585,30 +605,271 @@ inicial ajuda, mas não substitui a revisão de `git diff --cached`.
 
 ## Projetos e abas do terminal
 
-Konen pode guardar como cada projeto é aberto sem espalhar arquivos de Kitty,
-Neovim ou assistentes por todos os repositórios:
+O Konen guarda a rotina de abertura dos seus projetos no repositório de estado.
+Cada projeto tem uma pasta, abas em uma ordem definida e, opcionalmente, ações
+associadas a tarefas do mise. O manifesto fica em `projects/NOME.toml` dentro do
+estado — por exemplo, `~/home/projects/my-app.toml` — e entra no mesmo backup.
+
+Os fluxos abaixo descrevem a branch `main`; confira a
+[disponibilidade na versão publicada](#código-em-desenvolvimento-e-versão-publicada)
+se algum comando não existir no seu executável.
+
+### Preparar e cadastrar um projeto
+
+Configure o estado com `konen init` antes de cadastrar projetos. A pasta do
+projeto já deve existir. Para abrir sessões, instale Kitty e deixe `kitty` e
+`kitten` disponíveis no `PATH`. Para abrir abas na janela atual, configure no
+seu `kitty.conf`:
+
+```text
+allow_remote_control yes
+```
+
+A edição de tarefas exige o mise e o Neovim (`nvim`) disponíveis no `PATH`.
+Programas usados pelas abas, como Claude, Codex ou outro editor, também precisam
+estar instalados. O cadastro não instala esses programas.
+
+Dentro de um projeto já existente:
 
 ```console
 cd ~/Documents/Projects/my-app
 konen project add
-konen projects
-konen dev --dry-run
-konen dev
 ```
 
-O assistente pergunta o nome, a pasta, o shell, ações nomeadas e abas. Uma ação
-é um nome pessoal para uma tarefa que o próprio projeto já declara no mise. Por
-exemplo, `checks` pode apontar para a tarefa `test`; `konen run my-app checks` e
-uma aba com `action = "checks"` executam a mesma tarefa, sem copiar seu comando
-para o manifesto. Abas ainda podem abrir um comando direto, como `nvim .`, ou
-apenas deixar um terminal. Os manifestos ficam em `~/home/projects`, portanto
-também entram no backup.
+De outra pasta, informe o caminho:
 
-`konen dev` encontra o projeto pela pasta atual. De qualquer outro lugar, use
-`konen dev my-app` ou o atalho `konen my-app`. Comandos de projeto têm uma
-aprovação local separada; uma edição ou pull exige
-`konen project trust NOME`. A tarefa continua no `mise.toml` do projeto e
-também respeita a confiança do mise. Veja [docs/projects.md](docs/projects.md).
+```console
+konen project add ~/Documents/Projects/my-app
+```
+
+O assistente pergunta nome, pasta, shell opcional e se deve manter a aba de
+origem. Depois, mostra o editor do projeto com uma aba `Terminal` inicial.
+Adicione as abas e ações desejadas e escolha **Salvar abas e ações**. O shell
+vazio usa `$SHELL`; nenhuma aba de editor ou assistente é criada implicitamente.
+
+### Abrir projetos, sessões ou uma única aba
+
+O caminho mais fácil para gerenciar projetos já cadastrados é:
+
+```console
+konen project
+```
+
+Selecione o projeto para abrir a sessão completa, abrir uma aba específica,
+editar e ordenar abas e ações, executar uma ação, ver as tarefas do mise ou
+abrir uma tarefa no Neovim. O menu principal de `konen` também oferece essa
+entrada. Use ↑/↓ para navegar, `/` para filtrar e Enter para escolher.
+
+Os atalhos diretos continuam disponíveis:
+
+```console
+konen projects                            # lista projetos cadastrados
+konen dev                                 # usa o projeto da pasta atual
+konen dev my-app                           # abre a sessão pelo nome
+konen my-app                              # atalho equivalente
+konen dev my-app --dry-run                 # mostra a sessão sem abrir abas
+konen dev my-app --tab "Terminal"          # abre somente esta aba
+konen dev my-app --tab "Claude" --dry-run   # inspeciona somente esta aba
+```
+
+Sem nome, `konen dev` procura o projeto que contém a pasta atual; fora de um
+projeto cadastrado, oferece um seletor. Em uma sessão não interativa, informe o
+nome quando ele não puder ser inferido. `konen projects` e
+`konen project list` são equivalentes e mostram também a aprovação local.
+
+Dentro do Kitty, as novas abas são abertas na janela atual, na pasta do projeto,
+e a primeira recebe foco. Fora do Kitty, o Konen abre uma nova janela. `--tab`
+usa o título exato salvo no cadastro e pode ser usado também em
+`konen my-app --tab "Terminal"`. Ele abre outra instância daquela aba; não
+seleciona nem substitui uma aba que já esteja aberta.
+
+### O que acontece quando um comando termina
+
+Por padrão, sair de Claude, Codex, Neovim ou outro comando deixa um shell
+utilizável na mesma aba, na pasta do projeto. A aba mantém sua posição. O prompt
+fica disponível para você executar o comando novamente, inclusive depois de
+uma saída acidental.
+
+Essa escolha é feita por aba no campo **Quando o processo terminar**:
+
+| Escolha no assistente | Campo no manifesto | Resultado |
+| --- | --- | --- |
+| **Voltar ao shell** | `hold = true`, ou campo ausente | O Kitty mantém a aba e abre um shell após o processo inicial terminar. |
+| **Fechar a aba** | `hold = false` | A aba fecha quando o processo termina. |
+
+Abas de cadastros antigos sem `hold` passam a usar o retorno ao shell. Um
+`hold = false` escrito explicitamente continua sendo respeitado. Esse recurso
+usa o comportamento nativo de
+[`launch --hold` do Kitty](https://sw.kovidgoyal.net/kitty/launch/#cmdoption-launch-hold).
+
+A **aba de origem**, na qual você executou `konen dev`, tem uma configuração
+separada: `keep_invoking_tab` usa `true` por padrão. `false` fecha o terminal
+invocador depois de abrir a sessão completa; se ele era o único terminal da aba,
+a aba também fecha. Abrir somente uma aba com `--tab` sempre mantém a origem.
+
+Essas escolhas valem para novas aberturas. Uma edição do cadastro não altera,
+fecha ou reordena as abas de uma sessão que já está em uso.
+
+### Editar abas e comandos de um projeto cadastrado
+
+```console
+konen project edit my-app
+# Dentro do projeto, o nome é opcional:
+konen project edit
+```
+
+O menu mostra as abas na ordem de abertura e o comando ou ação de cada uma.
+Selecione diretamente o item que deseja alterar:
+
+- **Aba existente:** edite título, tipo de conteúdo, comando e comportamento ao
+  sair; mova uma posição para cima ou para baixo; ou remova a aba. O projeto
+  precisa manter pelo menos uma aba, com títulos distintos.
+- **Adicionar aba:** escolha um shell, comando direto, ação cadastrada ou tarefa
+  da lista do mise. Exemplos de comandos diretos são `claude`, `codex` e `nvim .`.
+  Ao escolher uma tarefa, o assistente reutiliza ou cria uma ação que a referencia.
+- **Ação existente:** altere o nome pessoal ou a tarefa associada, abra sua
+  implementação no Neovim ou remova a ação. Renomear uma ação atualiza as abas
+  que a usam; para remover uma ação em uso, ajuste essas abas primeiro.
+- **Pasta, shell e preferências do projeto:** altere os dados da sessão e a
+  preferência sobre a aba de origem. O nome de um projeto já cadastrado é fixo.
+
+**Salvar abas e ações** grava o manifesto e aprova esse conteúdo localmente.
+**Descartar alterações** preserva o cadastro anterior. Escape dentro de um
+formulário cancela aquela edição; sair do editor do projeto sem salvar descarta
+as mudanças pendentes nas abas e ações.
+
+### Entender abas, ações e tarefas
+
+| Elemento | Onde fica | Exemplo |
+| --- | --- | --- |
+| Aba | Manifesto do Konen | `Claude`, executando `claude`, ou `Checks`, usando uma ação. |
+| Ação | Manifesto do Konen | O nome pessoal `checks`, apontando para a tarefa `test`. |
+| Tarefa | Configuração ou script nativo do mise | `test`, implementada por `go test ./...`. |
+| Comando pessoal | `scripts/bin` no estado | Um executável seu, disponível no `PATH` e utilizável em abas. |
+
+Por exemplo, um projeto Go pode ter esta tarefa no seu próprio `mise.toml`:
+
+```toml
+[tasks.test]
+description = "Executa os testes"
+run = "go test ./..."
+```
+
+O cadastro correspondente no estado pode ser:
+
+```toml
+version = 2
+path = "~/Documents/Projects/my-app"
+keep_invoking_tab = true
+
+[actions.checks]
+task = "test"
+
+[[tabs]]
+title = "Claude"
+command = "claude"
+hold = true
+
+[[tabs]]
+title = "Checks"
+action = "checks"
+hold = true
+
+[[tabs]]
+title = "Terminal"
+```
+
+`konen run my-app checks` e a aba `Checks` executam a mesma tarefa, com
+`mise run --raw test` na pasta cadastrada. Uma aba usa `command` ou `action`;
+ambos vazios abrem um shell. O corpo da tarefa continua no arquivo do mise.
+
+```console
+konen run my-app checks --dry-run
+konen run my-app checks
+# Dentro do projeto:
+konen run checks
+```
+
+`konen project run my-app checks` é a forma equivalente sob o grupo `project`.
+O `--dry-run` mostra a ação, a tarefa, a pasta e a aprovação, sem executar a tarefa.
+
+### Ver tarefas do mise e editar pelo Neovim
+
+```console
+konen project tasks my-app
+konen project task edit my-app
+konen project task edit my-app test
+```
+
+A listagem mostra nome, descrição, comando, escopo e arquivo de origem das
+tarefas que o mise encontra na pasta cadastrada, inclusive tarefas globais.
+A implementação pode estar em `mise.toml` ou em um script de tarefas nativo.
+Comandos pessoais de `scripts/bin` são executáveis separados; só aparecem nessa
+lista se também houver uma tarefa do mise que os represente.
+
+Na edição, omitir a tarefa abre um seletor pesquisável. Omita também o projeto
+para usar a pasta atual ou escolher um cadastro:
+
+```console
+konen project tasks
+konen project task edit
+```
+
+Com um único argumento após `edit`, ele é o **nome do projeto**. Para escolher
+uma tarefa diretamente, informe os dois nomes: `konen project task edit my-app test`.
+
+O fluxo de edição é:
+
+1. O Konen mostra a tarefa e o arquivo de origem, e abre um rascunho no Neovim.
+   Em TOML, o cursor começa na definição da tarefa quando ela é localizada;
+   tarefas em arquivo abrem o script correspondente.
+2. Edite e use `:wq` para revisar a alteração. `:cq` cancela, preservando o original.
+3. O Konen valida a sintaxe TOML e oferece voltar ao editor se houver erro.
+   Scripts são tratados como texto; sua sintaxe e seu comportamento não são
+   validados nem executados.
+4. Revise o diff e confirme para gravar. Recusar a confirmação preserva o
+   original. Se o arquivo mudar por outro processo durante a edição, o Konen
+   recusa sobrescrevê-lo.
+
+Como o rascunho contém o arquivo completo, a revisão inclui todas as alterações
+que você fizer nele. Comentários e conteúdo não editados são preservados,
+assim como as permissões do arquivo, inclusive o bit executável dos scripts.
+
+As tarefas são salvas separadamente das abas e ações. Se você editar uma tarefa
+pelo menu do projeto e confirmar seu diff, descartar depois as mudanças nas abas
+não desfaz a tarefa já salva. O arquivo de origem exibido também deixa claro
+quando a tarefa é global e sua edição pode afetar outros projetos.
+
+### Aprovar alterações e resolver problemas comuns
+
+A aprovação do manifesto é local e depende do conteúdo exato. O assistente
+aprova o manifesto ao salvar; uma edição manual ou um `git pull` que o modifique
+exige revisão e nova aprovação:
+
+```console
+konen project show my-app
+konen project trust my-app
+konen dev my-app --dry-run
+```
+
+A tarefa tem sua própria fronteira de confiança no mise. Editá-la pelo Neovim
+não executa nem aprova seu código automaticamente. Quando necessário, revise o
+arquivo e use `mise trust` na pasta do projeto. Se a tarefa pertence ao estado
+global gerenciado pelo Konen, revise também a alteração nesse estado e execute
+`konen trust` antes de usar suas operações protegidas.
+
+| Situação | Próximo passo |
+| --- | --- |
+| Um comando novo não existe no executável | Veja `konen version` e a disponibilidade em `main` versus release. |
+| Kitty não permite abrir abas na janela atual | Confira `allow_remote_control yes`, recarregue a configuração do Kitty e execute a partir de uma aba dele. |
+| A aba ainda fecha ao sair do comando | Edite a aba, escolha **Voltar ao shell**, salve e abra uma nova instância; confira se havia `hold = false` explícito. |
+| A ordem das abas abertas não mudou | A ordem salva é aplicada na próxima abertura da sessão. |
+| O mise não lista tarefas ou pede confiança | Confira o `mise.toml` e os arquivos de tarefas na pasta cadastrada; revise antes de aprovar. |
+| O Neovim não foi encontrado | Disponibilize `nvim` no `PATH` e repita a edição. |
+
+O [guia de projetos](docs/projects.md) detalha o manifesto e suas regras. As
+preferências gerais do Kitty continuam sendo configurações do terminal,
+gerenciáveis como dotfiles; o Konen não muda seus atalhos de teclado.
 
 ## Comandos do dia a dia
 
@@ -639,9 +900,14 @@ também respeita a confiança do mise. Veja [docs/projects.md](docs/projects.md)
 | `konen installer add --from ARQUIVO [NOME]` | Importa e seleciona um instalador existente. |
 | `konen dotfile add CAMINHO` | Passa a gerenciar uma configuração existente. |
 | `konen project add [DIR]` | Cadastra um projeto, suas ações e abas. |
+| `konen project` | Abre o gerenciador de projetos, abas e tarefas. |
+| `konen project edit [NOME]` | Edita e ordena abas e ações pelo assistente. |
+| `konen project tasks [NOME]` | Lista tarefas, comandos e arquivos do mise. |
+| `konen project task edit [NOME] [TAREFA]` | Edita uma tarefa no Neovim com revisão do diff. |
 | `konen projects` | Lista projetos e a situação da aprovação. |
 | `konen run [PROJETO] AÇÃO` | Executa uma ação nomeada pela tarefa do mise. |
 | `konen dev [NOME]` | Abre as abas do projeto no Kitty. |
+| `konen dev [NOME] --tab TÍTULO` | Abre somente a aba escolhida. |
 | `konen doctor` | Diagnostica instalação, estado, confiança, mise e Git. |
 | `konen completion SHELL` | Gera autocomplete para Zsh, Bash ou Fish. |
 
@@ -671,6 +937,9 @@ konen completion fish > ~/.config/fish/completions/konen.fish
 ```
 
 O autocomplete inclui comandos, opções, caminhos, nomes de projetos e ações.
+Zsh e Bash também sugerem títulos cadastrados ao completar `konen dev NOME
+--tab`. Após atualizar o Konen, abra outro shell para carregar a definição nova;
+no Fish, gere novamente o arquivo de completions.
 
 ## Compatibilidade e migrações
 
@@ -761,22 +1030,76 @@ Mais detalhes estão em [docs/architecture.md](docs/architecture.md).
 
 ## Desenvolvimento do Konen
 
-O próprio repositório usa mise:
+Para usar o código atual da branch `main`, clone o repositório público:
 
 ```console
+git clone https://github.com/roqem/konen.git
+cd konen
+```
+
+O próprio repositório usa mise. Leia o `mise.toml` antes de aprová-lo e execute:
+
+```console
+mise trust
 mise install
 mise run check
+mise run build
+./bin/konen version
+./bin/konen help
+./bin/konen project
 ```
+
+`check` executa formatação, análise estática e testes, incluindo jornadas de
+integração em diretórios temporários. `build` produz `bin/konen`. Use
+`./bin/konen` para testar esta compilação; o comando `konen` do seu `PATH`
+continua apontando para a instalação que você já tinha. O binário local usa a
+mesma configuração de estado do usuário, por isso as alterações salvas por ele
+também serão vistas pela instalação existente.
 
 Sem mise, use Go 1.27.0 ou mais recente:
 
 ```console
+go vet ./...
 go test ./...
-go build ./cmd/konen
+go build -trimpath -o bin/konen ./cmd/konen
+./bin/konen help
 ```
 
 Critérios de release e o teste numa VM limpa estão em
 [docs/testing.md](docs/testing.md).
+
+### Manter a documentação e o GitHub atualizados
+
+Uma mudança concluída inclui o código, os testes pertinentes, a ajuda da CLI,
+os exemplos deste README e os guias afetados em `docs/`. O envio ao GitHub faz
+parte da entrega; alterações prontas não devem existir apenas na máquina de
+quem as implementou.
+
+O fluxo de manutenção é:
+
+1. Atualizar as referências com `git fetch origin` e conferir a branch com
+   `git status --short --branch`, preservando mudanças locais ainda em andamento.
+2. Revisar os arquivos alterados e manter a documentação no mesmo conjunto de
+   commits da funcionalidade. Distinguir claramente recursos de `main` e da
+   release publicada.
+3. Executar `mise run check` e as verificações manuais pertinentes. Mudanças em
+   menus e edição pelo Neovim também precisam de uma passagem interativa.
+4. Adicionar os arquivos revisados ao Git, conferir `git diff --cached`, criar
+   o commit e enviá-lo ao GitHub. Contribuições externas entram por pull request;
+   a manutenção direta de `main` usa `git push origin main`.
+5. Conferir o CI daquele commit no
+   [GitHub Actions](https://github.com/roqem/konen/actions/workflows/ci.yml) e
+   verificar que `main` e `origin/main` apontam para o mesmo commit. Um push
+   enviado com CI falhando ainda exige correção.
+
+Publicar código em `main` e publicar um executável são etapas diferentes. Uma
+nova versão instalável exige uma tag, a conclusão do workflow de release e do
+smoke test do download público. Ao publicar, atualize a versão indicada na
+instalação, a nota de disponibilidade dos recursos e os exemplos de atualização.
+O procedimento está em [docs/distribution.md](docs/distribution.md).
+
+Este fluxo trata da manutenção do código público do Konen. O programa continua
+sem criar commits ou fazer pushes dos repositórios de estado dos usuários.
 
 ## Licença
 

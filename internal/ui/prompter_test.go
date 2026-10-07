@@ -15,6 +15,9 @@ func TestDefaultProjectTabDoesNotAssumeAnInstalledEditor(t *testing.T) {
 	if tab.Command != "" {
 		t.Fatalf("default command = %q, want an interactive shell", tab.Command)
 	}
+	if !tab.Hold {
+		t.Fatal("default tab should remain open after its command exits")
+	}
 }
 
 func TestApplyPartsFieldRendersASingleOption(t *testing.T) {
@@ -39,12 +42,5 @@ func TestProjectActionFieldsRejectIncompleteAndAmbiguousValues(t *testing.T) {
 	}
 	if err := validateProjectActionName([]ProjectActionAnswer{{Name: "test"}})("test"); err == nil {
 		t.Fatal("duplicate action name was accepted")
-	}
-	if err := validateTabAction([]ProjectActionAnswer{{Name: "test"}})("missing"); err == nil {
-		t.Fatal("unknown tab action was accepted")
-	}
-	action := "test"
-	if err := validateDirectCommand(&action)("go test ./..."); err == nil || !strings.Contains(err.Error(), "não ambos") {
-		t.Fatalf("action plus command error = %v", err)
 	}
 }

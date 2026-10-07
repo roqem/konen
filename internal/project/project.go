@@ -34,7 +34,7 @@ type Tab struct {
 	Title   string `toml:"title"`
 	Command string `toml:"command,omitempty"`
 	Action  string `toml:"action,omitempty"`
-	Hold    bool   `toml:"hold,omitempty"`
+	Hold    *bool  `toml:"hold,omitempty"`
 }
 
 type Named struct {
@@ -62,6 +62,10 @@ type Store struct {
 
 func (m Manifest) KeepsInvokingTab() bool {
 	return m.KeepInvokingTab == nil || *m.KeepInvokingTab
+}
+
+func (t Tab) HoldsOpen() bool {
+	return t.Hold == nil || *t.Hold
 }
 
 func (s Store) List() ([]Named, error) {

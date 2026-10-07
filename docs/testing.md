@@ -287,6 +287,25 @@ approved, and the dry run must show the exact directory, tab title and empty
 command. Opening the tabs for real is a separate optional check on a graphical
 VM with Kitty and `allow_remote_control yes`.
 
+In that Kitty session, add tabs for a short command and an interactive program.
+The default exit behavior must return to a usable shell in the same tab and
+directory. Explicit `hold = false` must still close the tab. Confirm both the
+current-window and new-window launch paths. Existing open sessions are not
+retrofitted by an edit.
+
+Run `konen project` and edit the example. Select one tab directly, reorder it,
+change its command and save. Repeat and cancel: the manifest must stay
+byte-for-byte unchanged. Rename an action used by a tab and verify that the tab
+still points to it. Open only `Terminal` with `konen dev example --tab Terminal`;
+the invoking tab must remain open even if the full session normally closes it.
+
+Use `konen project tasks example` to inspect native mise tasks, then
+`konen project task edit example` to select one in Neovim. Check both TOML and
+script tasks. Saving must show a diff, invalid TOML must offer correction, and
+`:cq` or declining the diff must preserve the original. No task may execute as
+part of discovery or editing. Any required native mise/state trust must remain
+explicit after a change.
+
 Qualify named actions in another harmless project. The task body belongs to the
 project's native `mise.toml`; the Konen manifest stores only the personal alias
 and tab reference:

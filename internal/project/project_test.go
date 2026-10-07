@@ -105,6 +105,24 @@ func TestKeepInvokingTabDefaultsToTrue(t *testing.T) {
 	}
 }
 
+func TestTabHoldDefaultsToTrueAndAllowsExplicitOptOut(t *testing.T) {
+	defaultManifest, err := Decode([]byte("version = 2\npath = '~/sample'\n[[tabs]]\ntitle = 'Terminal'\n"), "sample.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !defaultManifest.Tabs[0].HoldsOpen() {
+		t.Fatal("missing hold should keep the tab open")
+	}
+
+	closeManifest, err := Decode([]byte("version = 2\npath = '~/sample'\n[[tabs]]\ntitle = 'Checks'\nhold = false\n"), "sample.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if closeManifest.Tabs[0].HoldsOpen() {
+		t.Fatal("explicit hold = false should close the tab")
+	}
+}
+
 func TestPlanMigrationAddsVersionToLegacyProjectWithoutChangingIt(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sample.toml")
 	legacy := []byte("path = '~/sample'\n\n[[tabs]]\ntitle = 'Terminal'\n")

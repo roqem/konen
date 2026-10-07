@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -16,17 +17,20 @@ import (
 )
 
 func (a *App) runProject(ctx context.Context, args []string) error {
-	if len(args) == 0 {
-		return errors.New("informe uma ação: add, edit, list, show, trust ou run")
-	}
 	if len(args) == 2 && (args[1] == "-h" || args[1] == "--help") {
 		return a.printProjectActionHelp(args[0])
+	}
+	if len(args) == 3 && args[0] == "task" && args[1] == "edit" && isHelpArgument(args[2]) {
+		return a.printProjectActionHelp("task")
 	}
 	stateDir, err := a.loadState()
 	if err != nil {
 		return err
 	}
 	store := project.Store{StateDir: stateDir, HomeDir: a.options.HomeDir}
+	if len(args) == 0 {
+		return a.runProjectMenu(ctx, store)
+	}
 
 	switch args[0] {
 	case "list":
@@ -92,6 +96,13 @@ func (a *App) runProject(ctx context.Context, args []string) error {
 		return a.runProjectAdd(ctx, store, args[1:])
 	case "edit":
 		return a.runProjectEdit(ctx, store, args[1:])
+	case "tasks":
+		return a.runProjectTasks(ctx, store, args[1:])
+	case "task":
+		if len(args) < 2 || args[1] != "edit" {
+			return errors.New("uso: konen project task edit [NOME] [TAREFA]")
+		}
+		return a.runProjectTaskEdit(ctx, store, args[2:])
 	case "run":
 		return a.runNamedProjectAction(ctx, args[1:], true)
 	default:
@@ -105,7 +116,11 @@ func (a *App) printProjectActionHelp(action string) error {
 	case "add":
 		usage = "konen project add [DIR]"
 	case "edit":
-		usage = "konen project edit NOME"
+		usage = "konen project edit [NOME]"
+	case "tasks":
+		usage = "konen project tasks [NOME]"
+	case "task":
+		usage = "konen project task edit [NOME] [TAREFA]"
 	case "list":
 		usage = "konen project list"
 	case "show":
@@ -140,7 +155,7 @@ func (a *App) runProjectShortcut(ctx context.Context, args []string) error {
 	return a.runDev(ctx, args)
 }
 
-func (a *App) runProjectAdd(_ context.Context, store project.Store, args []string) error {
+func (a *App) runProjectAdd(ctx context.Context, store project.Store, args []string) error {
 	if len(args) > 1 {
 		return errors.New("project add aceita no máximo um caminho")
 	}
@@ -167,7 +182,7 @@ func (a *App) runProjectAdd(_ context.Context, store project.Store, args []strin
 		Name:            strings.ToLower(filepath.Base(resolved)),
 		Path:            resolved,
 		KeepInvokingTab: true,
-	})
+	}, a.projectServices(ctx))
 	if err != nil {
 		return err
 	}
@@ -195,19 +210,18 @@ func (a *App) runProjectAdd(_ context.Context, store project.Store, args []strin
 	return nil
 }
 
-func (a *App) runProjectEdit(_ context.Context, store project.Store, args []string) error {
-	if len(args) != 1 {
-		return errors.New("uso: konen project edit NOME")
+func (a *App) runProjectEdit(ctx context.Context, store project.Store, args []string) error {
+	if len(args) > 1 {
+		return errors.New("uso: konen project edit [NOME]")
 	}
 	if !a.options.Interactive {
 		return errors.New("project edit requer uma sessão interativa")
 	}
-	name := args[0]
-	manifest, _, err := store.Load(name)
+	name, manifest, resolved, err := a.projectForArgs(store, args)
 	if err != nil {
 		return err
 	}
-	resolved, err := store.ResolveProjectPath(manifest)
+	before, err := os.ReadFile(store.ManifestPath(name))
 	if err != nil {
 		return err
 	}
@@ -227,10 +241,10 @@ func (a *App) runProjectEdit(_ context.Context, store project.Store, args []stri
 	}
 	for _, tab := range manifest.Tabs {
 		answer.Tabs = append(answer.Tabs, ui.ProjectTabAnswer{
-			Title: tab.Title, Command: tab.Command, Action: tab.Action, Hold: tab.Hold,
+			Title: tab.Title, Command: tab.Command, Action: tab.Action, Hold: tab.HoldsOpen(),
 		})
 	}
-	answer, err = a.options.Prompter.Project(answer)
+	answer, err = a.options.Prompter.Project(answer, a.projectServices(ctx))
 	if err != nil {
 		return err
 	}
@@ -240,6 +254,13 @@ func (a *App) runProjectEdit(_ context.Context, store project.Store, args []stri
 	updated, err := a.manifestFromAnswer(answer)
 	if err != nil {
 		return err
+	}
+	current, err := os.ReadFile(store.ManifestPath(name))
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(before, current) {
+		return errors.New("o projeto mudou durante a edição; abra o assistente novamente")
 	}
 	path, err := store.Save(name, updated)
 	if err != nil {
@@ -281,8 +302,9 @@ func (a *App) manifestFromAnswer(answer ui.ProjectAnswer) (project.Manifest, err
 		manifest.Actions[action.Name] = project.Action{Task: action.Task}
 	}
 	for _, tab := range answer.Tabs {
+		hold := tab.Hold
 		manifest.Tabs = append(manifest.Tabs, project.Tab{
-			Title: tab.Title, Command: tab.Command, Action: tab.Action, Hold: tab.Hold,
+			Title: tab.Title, Command: tab.Command, Action: tab.Action, Hold: &hold,
 		})
 	}
 	return manifest, project.Validate(manifest)
@@ -425,7 +447,7 @@ func sortedActionNames(manifest project.Manifest) []string {
 }
 
 func (a *App) runDev(ctx context.Context, args []string) error {
-	name, dryRun, err := parseDevArgs(args)
+	name, tabTitle, dryRun, err := parseDevArgs(args)
 	if err != nil {
 		return err
 	}
@@ -459,6 +481,21 @@ func (a *App) runDev(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	if tabTitle != "" {
+		var selected *project.Tab
+		for _, tab := range manifest.Tabs {
+			if tab.Title == tabTitle {
+				selected = &tab
+				break
+			}
+		}
+		if selected == nil {
+			return fmt.Errorf("o projeto %q não possui a aba %q", name, tabTitle)
+		}
+		manifest.Tabs = []project.Tab{*selected}
+		keep := true
+		manifest.KeepInvokingTab = &keep
+	}
 	if dryRun {
 		a.printProjectPlan(name, projectDir, manifest)
 		if trusted {
@@ -478,26 +515,38 @@ func (a *App) runDev(ctx context.Context, args []string) error {
 	return a.launchKittySession(ctx, name, projectDir, manifest)
 }
 
-func parseDevArgs(args []string) (string, bool, error) {
-	var name string
+func parseDevArgs(args []string) (string, string, bool, error) {
+	var name, tab string
 	var dryRun bool
-	for _, arg := range args {
-		switch arg {
-		case "--dry-run":
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		switch {
+		case arg == "--dry-run":
 			dryRun = true
-		case "-h", "--help":
-			return "", false, errors.New("uso: konen dev [NOME] [--dry-run]")
+		case arg == "--tab":
+			index++
+			if index >= len(args) || strings.TrimSpace(args[index]) == "" || strings.HasPrefix(args[index], "--") {
+				return "", "", false, errors.New("--tab requer o título de uma aba")
+			}
+			tab = args[index]
+		case strings.HasPrefix(arg, "--tab="):
+			tab = strings.TrimPrefix(arg, "--tab=")
+			if strings.TrimSpace(tab) == "" {
+				return "", "", false, errors.New("--tab requer o título de uma aba")
+			}
+		case arg == "-h" || arg == "--help":
+			return "", "", false, errors.New("uso: konen dev [NOME] [--tab TÍTULO] [--dry-run]")
 		default:
 			if strings.HasPrefix(arg, "-") {
-				return "", false, fmt.Errorf("opção desconhecida: %s", arg)
+				return "", "", false, fmt.Errorf("opção desconhecida: %s", arg)
 			}
 			if name != "" {
-				return "", false, errors.New("dev aceita no máximo um nome de projeto")
+				return "", "", false, errors.New("dev aceita no máximo um nome de projeto")
 			}
 			name = arg
 		}
 	}
-	return name, dryRun, nil
+	return name, tab, dryRun, nil
 }
 
 func (a *App) selectProject(store project.Store) (string, error) {
@@ -543,7 +592,7 @@ func (a *App) launchInCurrentKitty(ctx context.Context, name, dir string, manife
 			"--tab-title", tab.Title, "--cwd", dir,
 			"--add-to-session", "konen-" + name,
 		}
-		if tab.Hold {
+		if tab.HoldsOpen() {
 			launchArgs = append(launchArgs, "--hold")
 		}
 		launchArgs = append(launchArgs, shell)
@@ -672,8 +721,8 @@ func (a *App) printProjectPlan(name, dir string, manifest project.Manifest) {
 			command = "<shell>"
 		}
 		afterExit := "fechar"
-		if tab.Hold {
-			afterExit = "manter"
+		if tab.HoldsOpen() {
+			afterExit = "voltar ao shell"
 		}
 		rows = append(rows, []string{tab.Title, command, afterExit})
 	}
@@ -686,7 +735,7 @@ func renderKittySession(dir, shell, misePath string, manifest project.Manifest) 
 		fmt.Fprintf(&output, "new_tab %s\n", shellQuote(tab.Title))
 		fmt.Fprintf(&output, "cd %s\n", shellQuote(dir))
 		output.WriteString("launch")
-		if tab.Hold {
+		if tab.HoldsOpen() {
 			output.WriteString(" --hold")
 		}
 		fmt.Fprintf(&output, " %s", shellQuote(shell))

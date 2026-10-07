@@ -11,21 +11,27 @@ Dentro do projeto, execute:
 konen project add
 ```
 
-O assistente pergunta um nome curto, a pasta, um shell opcional, ações nomeadas
-e uma ou mais abas. Uma aba vazia abre o shell de login na pasta do projeto. Um
-`command` direto é passado ao shell interativo com `-lic`, de modo que ele veja
-o ambiente do usuário; `hold = true` mantém a aba aberta depois que o comando
-termina. O primeiro cadastro pode ficar só com a aba `Terminal`: editores como
-o Neovim nunca são presumidos.
+O assistente pergunta um nome curto, a pasta e um shell opcional; em seguida,
+abre o menu de abas e ações. Uma aba vazia abre o shell de login na pasta do
+projeto. Um `command` direto é passado ao shell interativo com `-lic`, de modo que ele veja
+o ambiente do usuário. Quando o comando termina, a aba volta a um shell
+utilizável na mesma pasta e posição, onde você pode executar o comando outra
+vez. Isso usa o recurso nativo
+[`launch --hold` do Kitty](https://sw.kovidgoyal.net/kitty/launch/#cmdoption-launch-hold).
+Use `hold = false` quando quiser fechá-la automaticamente. O
+primeiro cadastro pode ficar só com a aba `Terminal`: editores como o Neovim
+nunca são presumidos.
 
 Use o projeto pela pasta atual ou pelo nome:
 
 ```console
 konen projects
+konen project
 konen dev
 konen dev my-app
 konen my-app
 konen dev my-app --dry-run
+konen dev my-app --tab "Terminal"
 ```
 
 `konen NOME` é a forma curta de `konen dev NOME` para um projeto já
@@ -33,10 +39,77 @@ cadastrado; pastas arbitrárias nunca são registradas implicitamente. `konen
 projects` é o comando principal de listagem. `konen project list` permanece
 como alias compatível.
 
+`konen project` abre o gerenciador: selecione um projeto para abrir a sessão
+completa, abrir somente uma aba, executar uma ação ou editar sua configuração.
+O menu principal de `konen` também oferece essa entrada. `--tab TÍTULO` abre
+somente a aba escolhida e mantém a aba invocadora; pode ser combinado com
+`--dry-run` e com o atalho `konen NOME`.
+
 Dentro do Kitty, o Konen usa o controle remoto para adicionar abas à janela
 atual e focar a primeira que criou. A aba invocadora permanece aberta por
 padrão. Isso exige `allow_remote_control yes` no `kitty.conf`. Fora do Kitty,
 ele produz uma sessão nativa temporária e abre uma nova janela.
+
+## Editar abas e ações
+
+```console
+konen project edit
+konen project edit my-app
+```
+
+Sem o nome, o Konen usa o projeto da pasta atual ou oferece uma seleção. O menu
+mostra as abas na ordem em que serão abertas e as ações com suas tarefas. Você
+pode escolher diretamente o item que quer alterar:
+
+- uma aba permite editar título, comando e comportamento ao sair, mover para
+  cima ou para baixo e remover;
+- uma nova aba pode abrir um shell, comando direto, ação cadastrada ou tarefa
+  escolhida na lista do mise;
+- uma ação permite trocar o nome ou a tarefa e abrir sua implementação no
+  Neovim. Renomear a ação atualiza as abas que a utilizam; remover uma ação em
+  uso exige ajustar essas abas primeiro.
+
+O comportamento ao sair é uma escolha explícita entre **Voltar ao shell**
+(padrão) e **Fechar a aba**. `hold` ausente em cadastros existentes também usa
+o novo padrão; um `hold = false` explícito continua sendo respeitado. As sessões
+já abertas não mudam: a escolha vale ao abrir novas abas.
+
+**Salvar abas e ações** grava o cadastro e sua aprovação local. Escape ou
+**Descartar alterações** preserva o cadastro anterior. Escape dentro de um
+formulário volta ao menu, sem aplicar aquela edição. Alterações na ordem não
+movem abas de uma sessão que já esteja aberta.
+
+## Ver e editar tarefas do mise
+
+```console
+konen project tasks my-app
+konen project task edit my-app
+konen project task edit my-app test
+```
+
+A listagem mostra nome, descrição, comando, escopo e arquivo de origem das
+tarefas que o mise resolve na pasta cadastrada, inclusive tarefas globais.
+Sem o projeto, esses comandos também usam a pasta atual ou o seletor. Na edição,
+omitir a tarefa abre uma lista pesquisável; `/` filtra as opções.
+
+O Neovim abre um rascunho do arquivo original, posicionado na definição da
+tarefa quando ela está num TOML. Tarefas em scripts abrem o script correspondente.
+Use `:wq` para revisar o diff ou `:cq` para cancelar. TOML inválido oferece a
+opção de voltar ao editor; o arquivo original só é substituído após a revisão.
+O rascunho contém o arquivo inteiro, e o diff inclui todas as edições feitas
+nele. Comentários e conteúdo não editados, além das permissões, são preservados.
+Uma alteração externa durante a edição impede a gravação sobre o conteúdo novo.
+
+Com um argumento após `konen project task edit`, ele é o nome do projeto. Para
+indicar a tarefa diretamente, use os dois nomes: `konen project task edit my-app
+test`. A listagem inclui tarefas locais e globais; confira o arquivo e o escopo
+antes de editar uma tarefa compartilhada com outros projetos.
+
+As edições de tarefas são salvas separadamente das abas e ações, inclusive
+quando iniciadas no assistente do projeto. Nenhuma tarefa é executada, instalada
+ou aprovada automaticamente pela edição. A sintaxe de scripts não é validada;
+a confiança continua sob responsabilidade do mise e, para tarefas do estado,
+também de `konen trust`.
 
 ## Ações são tarefas do mise
 
@@ -106,7 +179,7 @@ abas.
 abriram e a primeira recebeu foco; se ele for o único terminal da aba, o Kitty
 fecha essa aba também.
 
-Edite o cadastro pelo assistente com `konen project edit NOME`. `show`, `list`
+Edite o cadastro pelo assistente com `konen project edit [NOME]`. `show`, `list`
 e `--dry-run` são comandos de inspeção. A listagem e os planos também informam
 se a aprovação local ainda vale ou precisa de revisão.
 

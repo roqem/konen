@@ -725,15 +725,18 @@ func (a *App) printTopLevelCommandHelp(command string) bool {
 		commands = [][2]string{{"konen projects", "lista os projetos cadastrados"}}
 	case "project":
 		commands = [][2]string{
+			{"konen project", "abre o gerenciador de projetos"},
 			{"konen project add [DIR]", "cadastra um projeto"},
-			{"konen project edit NOME", "edita ações e abas"},
+			{"konen project edit [NOME]", "edita ações e abas"},
+			{"konen project tasks [NOME]", "lista tarefas e comandos do mise"},
+			{"konen project task edit [NOME] [TAREFA]", "edita uma tarefa no Neovim"},
 			{"konen project list", "lista os projetos"},
 			{"konen project show NOME", "mostra o manifesto"},
 			{"konen project trust NOME", "aprova o manifesto após revisão"},
 			{"konen project run NOME AÇÃO [--dry-run]", "executa ou inspeciona uma ação"},
 		}
 	case "dev":
-		commands = [][2]string{{"konen dev [NOME] [--dry-run]", "abre ou inspeciona uma sessão"}}
+		commands = [][2]string{{"konen dev [NOME] [--tab TÍTULO] [--dry-run]", "abre ou inspeciona uma sessão"}}
 	case "run":
 		commands = [][2]string{{"konen run [PROJETO] AÇÃO [--dry-run]", "executa ou inspeciona uma ação"}}
 	case "trust":
@@ -821,12 +824,15 @@ func (a *App) printHelp() {
 	})
 	a.printCommandGroup("Projetos", [][2]string{
 		{"konen projects", "lista os projetos cadastrados"},
+		{"konen project", "abre o gerenciador de projetos, abas e tarefas"},
 		{"konen project add [DIR]", "cadastra um projeto, suas ações e abas"},
-		{"konen project edit NOME", "edita um projeto pelo assistente"},
+		{"konen project edit [NOME]", "edita um projeto pelo assistente"},
+		{"konen project tasks [NOME]", "lista tarefas e comandos do mise"},
+		{"konen project task edit [NOME] [TAREFA]", "edita uma tarefa no Neovim"},
 		{"konen project show NOME", "mostra o manifesto de um projeto"},
 		{"konen project trust NOME", "aprova os comandos após revisão"},
 		{"konen project run NOME AÇÃO", "executa uma ação usando uma tarefa do mise"},
-		{"konen dev [NOME] [--dry-run]", "abre ou inspeciona a sessão do projeto"},
+		{"konen dev [NOME] [--tab TÍTULO] [--dry-run]", "abre ou inspeciona a sessão do projeto"},
 	})
 	a.printCommandGroup("Shell", [][2]string{
 		{"konen completion zsh|bash|fish", "gera o autocomplete"},

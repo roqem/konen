@@ -23,6 +23,10 @@ type runCall struct {
 	args        []string
 }
 
+func boolPointer(value bool) *bool {
+	return &value
+}
+
 type fakeRunner struct {
 	paths      map[string]string
 	outputs    map[string]string
@@ -113,8 +117,11 @@ func (unusedPrompter) ChooseApplyParts([]ui.ApplyPart) ([]string, error) {
 	return nil, errors.New("unexpected prompt")
 }
 func (unusedPrompter) Confirm(string) (bool, error) { return false, errors.New("unexpected prompt") }
-func (unusedPrompter) Project(ui.ProjectAnswer) (ui.ProjectAnswer, error) {
+func (unusedPrompter) Project(ui.ProjectAnswer, ui.ProjectServices) (ui.ProjectAnswer, error) {
 	return ui.ProjectAnswer{}, errors.New("unexpected prompt")
+}
+func (unusedPrompter) Choose(string, []ui.Choice) (string, error) {
+	return "", errors.New("unexpected prompt")
 }
 func (unusedPrompter) ChooseProject([]string) (string, error) {
 	return "", errors.New("unexpected prompt")
@@ -149,7 +156,7 @@ func (p menuPrompter) Menu(bool) (string, error) {
 	return p.action, p.err
 }
 
-func (p projectPrompter) Project(ui.ProjectAnswer) (ui.ProjectAnswer, error) {
+func (p projectPrompter) Project(ui.ProjectAnswer, ui.ProjectServices) (ui.ProjectAnswer, error) {
 	return p.answer, nil
 }
 
@@ -912,7 +919,7 @@ func TestDevOpensTabsInCurrentKittyAndFocusesFirst(t *testing.T) {
 		Path:    "~/Documents/Projects/sample",
 		Tabs: []project.Tab{
 			{Title: "Editor", Command: "nvim ."},
-			{Title: "Status", Command: "git status", Hold: true},
+			{Title: "Status", Command: "git status", Hold: boolPointer(false)},
 		},
 	})
 	if err != nil {
@@ -931,10 +938,17 @@ func TestDevOpensTabsInCurrentKittyAndFocusesFirst(t *testing.T) {
 	}
 	wantFirst := runCall{
 		dir: projectDir, name: "/bin/kitten",
-		args: []string{"@", "launch", "--self", "--type=tab", "--keep-focus", "--tab-title", "Editor", "--cwd", projectDir, "--add-to-session", "konen-sample", "/bin/zsh", "-lic", "nvim ."},
+		args: []string{"@", "launch", "--self", "--type=tab", "--keep-focus", "--tab-title", "Editor", "--cwd", projectDir, "--add-to-session", "konen-sample", "--hold", "/bin/zsh", "-lic", "nvim ."},
 	}
 	if !reflect.DeepEqual(runner.runs[1], wantFirst) {
 		t.Fatalf("first launch = %#v, want %#v", runner.runs[1], wantFirst)
+	}
+	wantSecond := runCall{
+		dir: projectDir, name: "/bin/kitten",
+		args: []string{"@", "launch", "--self", "--type=tab", "--keep-focus", "--tab-title", "Status", "--cwd", projectDir, "--add-to-session", "konen-sample", "/bin/zsh", "-lic", "git status"},
+	}
+	if !reflect.DeepEqual(runner.runs[2], wantSecond) {
+		t.Fatalf("second launch = %#v, want %#v", runner.runs[2], wantSecond)
 	}
 	wantFocus := runCall{dir: projectDir, name: "/bin/kitten", args: []string{"@", "focus-tab", "--match", "window_id:41"}}
 	if !reflect.DeepEqual(runner.runs[3], wantFocus) {
@@ -1065,7 +1079,7 @@ func TestDevActionTabRunsTheSameMiseTask(t *testing.T) {
 	manifestPath, err := store.Save("sample", project.Manifest{
 		Version: 2, Path: projectDir,
 		Actions: map[string]project.Action{"checks": {Task: "ci:check"}},
-		Tabs:    []project.Tab{{Title: "Checks", Action: "checks", Hold: true}},
+		Tabs:    []project.Tab{{Title: "Checks", Action: "checks", Hold: boolPointer(true)}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1165,7 +1179,7 @@ func TestDevRefusesChangedProjectUntilTrustedAgain(t *testing.T) {
 
 func TestRenderKittySessionQuotesCommands(t *testing.T) {
 	got := renderKittySession("/tmp/project with space", "/bin/zsh", "", project.Manifest{
-		Tabs: []project.Tab{{Title: "It's ready", Command: "printf '%s' ok", Hold: true}},
+		Tabs: []project.Tab{{Title: "It's ready", Command: "printf '%s' ok", Hold: boolPointer(true)}},
 	})
 	want := "new_tab 'It'\\''s ready'\n" +
 		"cd '/tmp/project with space'\n" +

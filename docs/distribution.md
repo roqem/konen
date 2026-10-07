@@ -1,5 +1,32 @@
 # Distribution
 
+## Source publication and documentation
+
+The public `main` branch is the current development source. Published tags and
+their release archives are separate deliverables. The README on `main` must
+state when a documented feature is not yet in the pinned installable release,
+link to that release's README and explain how to build the current source.
+
+For every completed change:
+
+1. Update CLI help, the README and affected guides alongside the implementation.
+2. Run `mise run check` and the applicable manual checks in `testing.md`.
+3. Review the complete diff, commit the intended files and push the completed
+   work to GitHub, using a pull request when required by the contribution or
+   branch workflow. Never overwrite unrelated local or remote work.
+4. Verify that the CI run for the pushed commit succeeds and that the intended
+   remote branch contains that commit. A local build alone is not publication.
+
+Before a release, update the install version and feature-availability note in
+the README, as well as version-specific qualification examples. Create the
+version tag on the reviewed commit and push it. Do not treat the new binary as
+qualified until both the release and published-download smoke jobs succeed.
+Record the actual qualification performed; retain the distinction between
+automated checks and a manual graphical/VM journey.
+
+These are maintainer operations on the Konen source repository. The Konen
+application does not create commits or push users' state repositories.
+
 ## Release artifacts
 
 A tag named `vX.Y.Z` triggers the release workflow. The workflow runs formatting,

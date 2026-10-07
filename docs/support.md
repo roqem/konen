@@ -28,6 +28,9 @@ privilégios próprios, sempre visíveis no plano ou no instalador pessoal.
 Zsh, Bash e Fish recebem autocomplete. A maior parte da CLI independe do shell.
 Sessões com abas exigem Kitty; ações de projeto, inspeção, migração e aplicação
 do estado não exigem Kitty.
+O gerenciador de projetos e a edição guiada exigem um terminal interativo.
+A edição assistida de tarefas exige Neovim (`nvim`) no `PATH`; a listagem de
+tarefas usa mise e independe do editor.
 
 ## Limites conhecidos
 
@@ -50,6 +53,12 @@ do estado não exigem Kitty.
   `apply`.
 - Não há desinstalador, pacote `.deb`, repositório APT, perfis de máquina ou
   integração com terminais diferentes do Kitty nesta fase.
+- Editar a ordem ou os comandos de um projeto altera seu cadastro para as
+  próximas aberturas, sem modificar sessões do Kitty já abertas. `--tab` abre
+  uma nova instância da aba selecionada.
+- A edição pelo Neovim valida sintaxe TOML, mas não valida a sintaxe ou o
+  comportamento dos scripts. Mudanças de tarefas e de manifestos são salvas
+  separadamente e mantêm suas respectivas fronteiras de confiança.
 
 ## Quais arquivos têm versão do Konen
 

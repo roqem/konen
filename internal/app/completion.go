@@ -41,7 +41,7 @@ func (a *App) runInternalComplete(args []string) error {
 		for _, item := range projects {
 			fmt.Fprintln(a.options.Out, item.Name)
 		}
-	case "actions":
+	case "actions", "tabs":
 		var name string
 		if len(args) == 2 {
 			name = args[1]
@@ -58,6 +58,12 @@ func (a *App) runInternalComplete(args []string) error {
 		manifest, _, err := store.Load(name)
 		if err != nil {
 			return err
+		}
+		if args[0] == "tabs" {
+			for _, tab := range manifest.Tabs {
+				fmt.Fprintln(a.options.Out, tab.Title)
+			}
+			return nil
 		}
 		for _, action := range sortedActionNames(manifest) {
 			fmt.Fprintln(a.options.Out, action)
@@ -87,6 +93,16 @@ _konen_projects() {
   local -a projects
   projects=("${(@f)$(konen __complete projects 2>/dev/null)}")
   _describe 'projeto' projects
+}
+
+_konen_tabs() {
+  local -a tabs
+  if [[ -n $1 && $1 != -* ]]; then
+    tabs=("${(@f)$(konen __complete tabs "$1" 2>/dev/null)}")
+  else
+    tabs=("${(@f)$(konen __complete tabs 2>/dev/null)}")
+  fi
+  compadd -a tabs
 }
 
 _konen_actions() {
@@ -151,6 +167,8 @@ _konen() {
     'show:mostra o manifesto de um projeto'
     'trust:aprova os comandos de um projeto'
     'run:executa uma ação nomeada do projeto'
+    'tasks:lista tarefas do mise'
+    'task:edita tarefas no Neovim'
   )
 
   if (( CURRENT == 2 )); then
@@ -331,6 +349,7 @@ _konen() {
       _arguments \
         '(-h --help)'{-h,--help}'[mostra ajuda]' \
         '--dry-run[mostra a sessão sem abrir abas]' \
+        '--tab=[abre uma aba]:aba:_konen_tabs $words[2]' \
         '1:projeto:_konen_projects'
       ;;
     run)
@@ -355,7 +374,7 @@ _konen() {
       (( CURRENT-- ))
       case $action in
         add) _arguments '1:pasta do projeto:_directories' ;;
-        edit|show|trust) _arguments '1:projeto:_konen_projects' ;;
+        edit|show|trust|tasks) _arguments '1:projeto:_konen_projects' ;;
         run)
           if (( CURRENT == 2 )); then
 				_alternative 'options:opção:(--dry-run -h --help)' 'projects:projeto:_konen_projects'
@@ -365,12 +384,19 @@ _konen() {
             _konen_actions "$words[2]"
           fi
           ;;
+        task)
+          if (( CURRENT == 2 )); then
+            _values 'operação' edit
+          elif (( CURRENT == 3 )); then
+            _konen_projects
+          fi
+          ;;
         list) _arguments ;;
         *) _describe 'ação' project_actions ;;
       esac
       ;;
     *)
-      _arguments '--dry-run[mostra a sessão sem abrir abas]'
+      _arguments '--dry-run[mostra a sessão sem abrir abas]' '--tab=[abre uma aba]:aba:_konen_tabs $command'
       ;;
   esac
 }
@@ -484,7 +510,18 @@ const bashCompletion = `_konen_completion() {
       fi
       ;;
     dev)
-      COMPREPLY=( $(compgen -W "--dry-run -h --help $(konen __complete projects 2>/dev/null)" -- "$current") )
+      if [[ $previous == --tab ]]; then
+        local IFS=$'\n'
+        local project_name="${COMP_WORDS[2]}"
+        if [[ $project_name == -* ]]; then project_name=''; fi
+        if [[ -n $project_name ]]; then
+          COMPREPLY=( $(compgen -W "$(konen __complete tabs "$project_name" 2>/dev/null)" -- "$current") )
+        else
+          COMPREPLY=( $(compgen -W "$(konen __complete tabs 2>/dev/null)" -- "$current") )
+        fi
+        return
+      fi
+      COMPREPLY=( $(compgen -W "--tab --dry-run -h --help $(konen __complete projects 2>/dev/null)" -- "$current") )
       ;;
     run)
       if [[ $COMP_CWORD -eq 2 ]]; then
@@ -501,10 +538,14 @@ const bashCompletion = `_konen_completion() {
     project)
       action="${COMP_WORDS[2]}"
       if [[ $COMP_CWORD -eq 2 ]]; then
-        COMPREPLY=( $(compgen -W 'add edit list show trust run' -- "$current") )
+        COMPREPLY=( $(compgen -W 'add edit list show trust run tasks task' -- "$current") )
       elif [[ $action == add ]]; then
         COMPREPLY=( $(compgen -d -- "$current") )
-      elif [[ $action == edit || $action == show || $action == trust ]]; then
+      elif [[ $action == edit || $action == show || $action == trust || $action == tasks ]]; then
+        COMPREPLY=( $(compgen -W "$(konen __complete projects 2>/dev/null)" -- "$current") )
+      elif [[ $action == task && $COMP_CWORD -eq 3 ]]; then
+        COMPREPLY=( $(compgen -W 'edit' -- "$current") )
+      elif [[ $action == task && $COMP_CWORD -eq 4 ]]; then
         COMPREPLY=( $(compgen -W "$(konen __complete projects 2>/dev/null)" -- "$current") )
       elif [[ $action == run && $COMP_CWORD -eq 3 ]]; then
 		COMPREPLY=( $(compgen -W "--dry-run -h --help $(konen __complete projects 2>/dev/null)" -- "$current") )
@@ -515,7 +556,7 @@ const bashCompletion = `_konen_completion() {
       fi
       ;;
     *)
-      COMPREPLY=( $(compgen -W '--dry-run' -- "$current") )
+      COMPREPLY=( $(compgen -W '--tab --dry-run' -- "$current") )
       ;;
   esac
 }
@@ -581,16 +622,19 @@ complete -c konen -n '__fish_seen_subcommand_from installer' -l yes -d 'Grava se
 complete -c konen -n '__fish_seen_subcommand_from installer' -l dry-run -d 'Mostra os arquivos sem gravar'
 complete -c konen -n '__fish_seen_subcommand_from dotfile' -a add -d 'Adiciona um dotfile ao estado'
 complete -c konen -n '__fish_seen_subcommand_from dotfile' -l mode -r -a 'symlink copy template' -d 'Modo do dotfile'
+complete -c konen -n '__fish_seen_subcommand_from dev' -l tab -r -d 'Abre uma aba pelo título'
 complete -c konen -n '__fish_seen_subcommand_from dev' -l dry-run -d 'Mostra a sessão sem abrir abas'
 complete -c konen -n '__fish_seen_subcommand_from dev' -a '(konen __complete projects 2>/dev/null)' -d 'Projeto'
 complete -c konen -n '__fish_seen_subcommand_from run' -l dry-run -d 'Mostra a ação sem executar a tarefa'
 complete -c konen -n '__fish_seen_subcommand_from run' -a '(konen __complete actions 2>/dev/null) (konen __complete projects 2>/dev/null)' -d 'Ação ou projeto'
 complete -c konen -n '__fish_seen_subcommand_from run; and test (count (commandline -opc)) -eq 3' -a '(konen __complete actions (commandline -opc)[3] 2>/dev/null)' -d 'Ação'
-complete -c konen -n '__fish_seen_subcommand_from project; and test (count (commandline -opc)) -eq 2' -a 'add edit list show trust run'
+complete -c konen -n '__fish_seen_subcommand_from project; and test (count (commandline -opc)) -eq 2' -a 'add edit list show trust run tasks task'
 complete -c konen -n '__fish_seen_subcommand_from project; and __fish_seen_subcommand_from add' -F -d 'Pasta do projeto'
-complete -c konen -n '__fish_seen_subcommand_from project; and __fish_seen_subcommand_from edit show trust; and test (count (commandline -opc)) -eq 3' -a '(konen __complete projects 2>/dev/null)' -d 'Projeto'
+complete -c konen -n '__fish_seen_subcommand_from project; and __fish_seen_subcommand_from edit show trust tasks; and test (count (commandline -opc)) -eq 3' -a '(konen __complete projects 2>/dev/null)' -d 'Projeto'
 complete -c konen -n '__fish_seen_subcommand_from project; and __fish_seen_subcommand_from run; and test (count (commandline -opc)) -eq 3' -a '(konen __complete projects 2>/dev/null)' -d 'Projeto'
 complete -c konen -n '__fish_seen_subcommand_from project; and __fish_seen_subcommand_from run; and test (count (commandline -opc)) -eq 4' -a '(konen __complete actions (commandline -opc)[4] 2>/dev/null)' -d 'Ação'
 complete -c konen -n '__fish_seen_subcommand_from project; and __fish_seen_subcommand_from run' -l dry-run -d 'Mostra a ação sem executar a tarefa'
+complete -c konen -n '__fish_seen_subcommand_from project; and __fish_seen_subcommand_from task; and test (count (commandline -opc)) -eq 3' -a edit -d 'Edita uma tarefa no Neovim'
+complete -c konen -n '__fish_seen_subcommand_from project; and __fish_seen_subcommand_from task; and test (count (commandline -opc)) -eq 4' -a '(konen __complete projects 2>/dev/null)' -d 'Projeto'
 complete -c konen -n '__fish_seen_subcommand_from completion' -a 'zsh bash fish'
 `

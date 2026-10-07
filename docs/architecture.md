@@ -118,6 +118,22 @@ approval.
   The manifest approval authorizes the mapping; mise's own trust still
   authorizes the project configuration that implements the task. Dry runs call
   neither layer and expose both the mapping and current manifest approval.
+- The project manager presents existing tabs and actions for direct selection.
+  Tab order is saved in the manifest; renaming an action updates its tab
+  references. Cancellation preserves the saved manifest, and saving refuses
+  an external change made while the editor was open. Existing Kitty sessions
+  are not modified by editing their manifest.
+- Tabs use Kitty's native `--hold` by default to return to a shell after the
+  initial process exits. An explicit `hold = false` opts into automatic closure.
+  Opening a single configured tab still validates approval of the full manifest
+  and preserves the invoking terminal.
+- Task discovery consumes `mise tasks ls --json` from the registered project
+  directory, with automatic tool installation disabled. Mise resolves native
+  local and global tasks and retains its own configuration trust boundary.
+  Editing opens a private draft in Neovim, checks TOML syntax when applicable,
+  displays the complete diff and replaces the original atomically after review.
+  File modes are preserved and concurrent changes block replacement. Task edits
+  are independent of pending manifest edits and do not execute or reapprove code.
 
 ## Project and tool configuration
 

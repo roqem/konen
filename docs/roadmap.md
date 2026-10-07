@@ -66,7 +66,14 @@ Objetivo: tornar manutenção e atualização tão claras quanto o primeiro uso.
   versionar ou reescrever o `mise.toml` nativo;
 - [x] modelar ações nomeadas de projeto, como preparar, testar, abrir console ou
   gerar cobertura, sem transformá-las em funções escondidas do Konen;
-- [x] permitir que abas reutilizem essas ações em vez de duplicar comandos longos.
+- [x] permitir que abas reutilizem essas ações em vez de duplicar comandos longos;
+- [x] voltar ao shell após encerrar o comando de uma aba, com fechamento
+  automático somente quando configurado explicitamente;
+- [x] reunir abertura, edição direta e ordenação de abas no gerenciador de projetos;
+- [x] listar tarefas nativas do mise e editá-las pelo Neovim com revisão do diff.
+
+Essas melhorias estão concluídas em `main`; a disponibilidade nos executáveis
+publicados é indicada no [README](../README.md#código-em-desenvolvimento-e-versão-publicada).
 
 Critério de conclusão: o usuário entende o resultado de cada aplicação, atualiza
 o produto conscientemente e mantém rotinas de projeto no estado central sem
