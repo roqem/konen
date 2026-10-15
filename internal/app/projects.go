@@ -600,7 +600,7 @@ func (a *App) launchInCurrentKitty(ctx context.Context, name, dir string, manife
 		if command == "" {
 			launchArgs = append(launchArgs, "-l")
 		} else {
-			launchArgs = append(launchArgs, "-lic", command)
+			launchArgs = append(launchArgs, "-lic", projectTabShellCommand(command, tab.HoldsOpen()))
 		}
 		output, err := a.options.Runner.Output(ctx, dir, kitten, launchArgs...)
 		if err != nil {
@@ -743,11 +743,24 @@ func renderKittySession(dir, shell, misePath string, manifest project.Manifest) 
 		if command == "" {
 			output.WriteString(" -l\n\n")
 		} else {
-			fmt.Fprintf(&output, " -lic %s\n\n", shellQuote(command))
+			fmt.Fprintf(&output, " -lic %s\n\n", shellQuote(projectTabShellCommand(command, tab.HoldsOpen())))
 		}
 	}
 	output.WriteString("focus_tab 0\n")
 	return output.String()
+}
+
+func projectTabShellCommand(command string, hold bool) string {
+	if !hold {
+		return command
+	}
+	// Zsh can exec the final external command instead of waiting for it. With
+	// job control enabled, that leaves Kitty's replacement shell outside the
+	// terminal's foreground process group and its first read fails with EIO.
+	// Keep the command shell alive until it restores job control. eval quotes
+	// the original command as one argument, so a trailing comment cannot hide
+	// the final exit, whose implicit status preserves the command's result.
+	return "eval " + shellQuote(command) + "; exit"
 }
 
 func projectTabDescription(manifest project.Manifest, tab project.Tab) string {

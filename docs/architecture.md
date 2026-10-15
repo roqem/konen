@@ -125,6 +125,12 @@ approval.
   are not modified by editing their manifest.
 - Tabs use Kitty's native `--hold` by default to return to a shell after the
   initial process exits. An explicit `hold = false` opts into automatic closure.
+  Held commands keep their initial interactive shell alive until the command
+  finishes (`eval` of the quoted command, followed by `exit` with its original
+  status). This prevents Zsh's final-command exec optimization from abandoning
+  the terminal foreground process group: otherwise Kitty's replacement shell
+  can display a prompt and immediately fail to read the TTY with `EIO`.
+  Both remote launches and generated session files use the same guard.
   Opening a single configured tab still validates approval of the full manifest
   and preserves the invoking terminal.
 - Task discovery consumes `mise tasks ls --json` from the registered project

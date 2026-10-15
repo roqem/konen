@@ -938,7 +938,7 @@ func TestDevOpensTabsInCurrentKittyAndFocusesFirst(t *testing.T) {
 	}
 	wantFirst := runCall{
 		dir: projectDir, name: "/bin/kitten",
-		args: []string{"@", "launch", "--self", "--type=tab", "--keep-focus", "--tab-title", "Editor", "--cwd", projectDir, "--add-to-session", "konen-sample", "--hold", "/bin/zsh", "-lic", "nvim ."},
+		args: []string{"@", "launch", "--self", "--type=tab", "--keep-focus", "--tab-title", "Editor", "--cwd", projectDir, "--add-to-session", "konen-sample", "--hold", "/bin/zsh", "-lic", "eval 'nvim .'; exit"},
 	}
 	if !reflect.DeepEqual(runner.runs[1], wantFirst) {
 		t.Fatalf("first launch = %#v, want %#v", runner.runs[1], wantFirst)
@@ -1092,7 +1092,7 @@ func TestDevActionTabRunsTheSameMiseTask(t *testing.T) {
 	if err := application.Run(context.Background(), []string{"dev", "sample"}); err != nil {
 		t.Fatal(err)
 	}
-	wantCommand := "'/opt/konen bin/mise' run --raw 'ci:check'"
+	wantCommand := `eval ''\''/opt/konen bin/mise'\'' run --raw '\''ci:check'\'''; exit`
 	if len(runner.runs) != 3 || runner.runs[1].args[len(runner.runs[1].args)-1] != wantCommand {
 		t.Fatalf("action tab calls = %#v, command = %q", runner.runs, wantCommand)
 	}
@@ -1183,7 +1183,7 @@ func TestRenderKittySessionQuotesCommands(t *testing.T) {
 	})
 	want := "new_tab 'It'\\''s ready'\n" +
 		"cd '/tmp/project with space'\n" +
-		"launch --hold '/bin/zsh' -lic 'printf '\\''%s'\\'' ok'\n\n" +
+		`launch --hold '/bin/zsh' -lic 'eval '\''printf '\''\'\'''\''%s'\''\'\'''\'' ok'\''; exit'` + "\n\n" +
 		"focus_tab 0\n"
 	if got != want {
 		t.Fatalf("session =\n%s\nwant =\n%s", got, want)

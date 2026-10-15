@@ -21,6 +21,12 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Ensure terminal regression prerequisites
+        run: |
+          if ! command -v python3 || ! command -v zsh; then
+            sudo apt-get update
+            sudo apt-get install --yes python3 zsh
+          fi
       - run: sh -n install.sh
       - run: bash -n scripts/*.sh
       - run: test -z "$(gofmt -l .)"

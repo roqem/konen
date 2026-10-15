@@ -34,6 +34,14 @@ Linux integration journeys:
 The integration harness never applies the developer's machine state and never
 uses the developer's home directory.
 
+The Linux shell-return regression uses Python's standard-library PTY support
+and Zsh. CI and release jobs ensure both executables are installed; local runs
+skip this regression if either is unavailable. It exercises actual foreground
+process groups and verifies that a replacement shell executes typed input,
+preserves the working directory, and follows the expected exit status after
+normal completion, an error, SIGTERM and Ctrl+C. Merely displaying a prompt is
+not a successful return-to-shell check.
+
 Every tagged release adds a second, public smoke boundary after the archives
 are published. `scripts/smoke-release.sh vX.Y.Z` downloads the actual release
 and pinned mise into a disposable home, runs `init`, `doctor`, `status`, plan,
@@ -43,7 +51,7 @@ created. The release workflow fails when this post-publication journey fails.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.24` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.25` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -60,7 +68,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.24 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.25 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -145,9 +153,9 @@ konen update --yes --only konen
 konen version
 ```
 
-The dry run must show alpha.21 as current and alpha.24 as available without
+The dry run must show alpha.21 as current and alpha.25 as available without
 changing the first `konen version`. The confirmed command must verify, stage and
-install alpha.24. The configured state path and its Git status must remain
+install alpha.25. The configured state path and its Git status must remain
 unchanged.
 
 Qualify format migration with an isolated configuration and state, never the
@@ -362,6 +370,26 @@ whose result differs from this checklist. Revert the VM snapshot afterward;
 the test is deliberately allowed to change that disposable home.
 
 ## Latest qualification record
+
+### Alpha.25 candidate
+
+On 2026-10-15, the alpha.24 failure was reproduced without Godot or mise: a
+held interactive Zsh running an external command could leave the terminal's
+foreground process group behind, so the replacement Zsh exited with
+`error on TTY read: Input/output error`. The earlier alpha.24 check below did
+not exercise this interactive-Zsh execution path.
+
+The alpha.25 candidate passed `mise run check`, including the new PTY regression,
+and both Linux release archives built successfully. The regression fails with
+the old unguarded command and passes with the fix; it also checks command
+quoting, trailing comments, shell functions and exit codes.
+
+A separate check used the installed Kitty 0.47.0, mise 2026.8.15 and Godot .NET
+4.7 in a disposable project: `mise run --raw` launched the editor with
+`--headless --editor --quit`, then the replacement Zsh accepted a new command
+in the same directory. This did not open or close the user's graphical project,
+and was not a new complete clean-VM qualification. Published-download validation
+is performed separately by the release workflow.
 
 ### Alpha.24 candidate
 

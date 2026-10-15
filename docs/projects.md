@@ -18,6 +18,9 @@ o ambiente do usuário. Quando o comando termina, a aba volta a um shell
 utilizável na mesma pasta e posição, onde você pode executar o comando outra
 vez. Isso usa o recurso nativo
 [`launch --hold` do Kitty](https://sw.kovidgoyal.net/kitty/launch/#cmdoption-launch-hold).
+No Zsh, use alpha.25 ou posterior: ela corrige uma falha que ainda podia fechar
+a aba na alpha.24 ao terminar um comando externo ou uma tarefa do mise, mesmo
+com `hold = true`. Abas abertas pela versão antiga precisam ser reabertas.
 Use `hold = false` quando quiser fechá-la automaticamente. O
 primeiro cadastro pode ficar só com a aba `Terminal`: editores como o Neovim
 nunca são presumidos.
