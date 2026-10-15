@@ -43,7 +43,7 @@ created. The release workflow fails when this post-publication journey fails.
 ## Manual test on a clean Linux VM
 
 The final release qualification must use a disposable VM and a published test
-version. Replace `v0.1.0-alpha.23` below if the candidate has another version.
+version. Replace `v0.1.0-alpha.24` below if the candidate has another version.
 Tags with a prerelease suffix are published as GitHub prereleases and are not
 selected by an unpinned installer invocation.
 
@@ -60,7 +60,7 @@ Download and inspect the installer, then ask it for the exact candidate:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.23 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.24 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
@@ -145,9 +145,9 @@ konen update --yes --only konen
 konen version
 ```
 
-The dry run must show alpha.21 as current and alpha.23 as available without
+The dry run must show alpha.21 as current and alpha.24 as available without
 changing the first `konen version`. The confirmed command must verify, stage and
-install alpha.23. The configured state path and its Git status must remain
+install alpha.24. The configured state path and its Git status must remain
 unchanged.
 
 Qualify format migration with an isolated configuration and state, never the
@@ -362,6 +362,25 @@ whose result differs from this checklist. Revert the VM snapshot afterward;
 the test is deliberately allowed to change that disposable home.
 
 ## Latest qualification record
+
+### Alpha.24 candidate
+
+On 2026-10-14, the alpha.24 candidate passed `mise run check`, including the
+installer/updater integration journeys and the project-tab hold regressions.
+The release script built both Linux archives and their checksums verified.
+The candidate executable reported `0.1.0-alpha.24`; an existing approved
+project with no explicit `hold` setting reported `voltar ao shell`, including
+when selecting a single named-action tab with `--tab`.
+
+A PTY check using the installed Kitty 0.47.0 `kitten run-shell` also confirmed
+that a completed command was followed by a usable shell in the same working
+directory. This check did not launch or close the user's graphical application.
+No new complete clean-VM journey was performed for alpha.24. The release
+workflow separately gates publication and runs the published-download smoke
+described above; its results are available in
+[GitHub Actions](https://github.com/roqem/konen/actions/workflows/release.yml).
+
+### Clean-VM qualification baseline
 
 The representative private state passed the complete manual journey from
 `v0.1.0-alpha.6` through `v0.1.0-alpha.21` between 2026-08-31 and 2026-09-02 in

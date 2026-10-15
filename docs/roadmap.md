@@ -72,8 +72,8 @@ Objetivo: tornar manutenção e atualização tão claras quanto o primeiro uso.
 - [x] reunir abertura, edição direta e ordenação de abas no gerenciador de projetos;
 - [x] listar tarefas nativas do mise e editá-las pelo Neovim com revisão do diff.
 
-Essas melhorias estão concluídas em `main`; a disponibilidade nos executáveis
-publicados é indicada no [README](../README.md#código-em-desenvolvimento-e-versão-publicada).
+Essas melhorias estão disponíveis na alpha.24; a versão instalável e as
+instruções de atualização estão no [README](../README.md#código-em-desenvolvimento-e-versão-publicada).
 
 Critério de conclusão: o usuário entende o resultado de cada aplicação, atualiza
 o produto conscientemente e mantém rotinas de projeto no estado central sem

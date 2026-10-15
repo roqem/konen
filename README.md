@@ -39,15 +39,19 @@ verdade sobre o conteúdo da máquina.
 ### Código em desenvolvimento e versão publicada
 
 Este README acompanha a branch `main`. A versão instalável publicada é a
-[`v0.1.0-alpha.23`](https://github.com/roqem/konen/releases/tag/v0.1.0-alpha.23);
+[`v0.1.0-alpha.24`](https://github.com/roqem/konen/releases/tag/v0.1.0-alpha.24);
 seu comportamento está descrito no
-[README daquela versão](https://github.com/roqem/konen/blob/v0.1.0-alpha.23/README.md).
+[README daquela versão](https://github.com/roqem/konen/blob/v0.1.0-alpha.24/README.md).
 
 O gerenciador `konen project`, a edição direta e ordenação de abas, o retorno ao
-shell por padrão, `--tab` e a edição de tarefas no Neovim estão em `main` e
-ainda não fazem parte da alpha.23. Para usá-los antes da próxima release,
-[compile o código atual](#desenvolvimento-do-konen). Fazer `git pull` atualiza o
-código; `konen update` atualiza o executável a partir de releases publicadas.
+shell por padrão, `--tab` e a edição de tarefas no Neovim estão disponíveis a
+partir da alpha.24. Quem ainda usa a alpha.23 deve executar
+`konen update --only konen` e conferir `konen version`. Abas já abertas mantêm
+o comportamento da sessão antiga; reabra as abas desejadas com a versão nova.
+
+Fazer `git pull` atualiza o código; `konen update` atualiza o executável a partir
+de releases publicadas. Para experimentar mudanças posteriores à release,
+[compile o código atual](#desenvolvimento-do-konen).
 
 ## Instalação
 
@@ -57,7 +61,7 @@ selecionadas automaticamente:
 ```console
 curl -fsSLO https://raw.githubusercontent.com/roqem/konen/main/install.sh
 less install.sh
-KONEN_VERSION=v0.1.0-alpha.23 sh install.sh
+KONEN_VERSION=v0.1.0-alpha.24 sh install.sh
 export PATH="$HOME/.local/bin:$PATH"
 konen version
 ```
